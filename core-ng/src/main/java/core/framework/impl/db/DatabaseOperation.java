@@ -1,10 +1,10 @@
 package core.framework.impl.db;
 
-import core.framework.api.db.UncheckedSQLException;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Lists;
+import core.framework.db.UncheckedSQLException;
 import core.framework.impl.resource.Pool;
 import core.framework.impl.resource.PoolItem;
+import core.framework.util.Exceptions;
+import core.framework.util.Lists;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -12,7 +12,6 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,13 +27,13 @@ public class DatabaseOperation {
     final EnumDBMapper enumMapper = new EnumDBMapper();
     int queryTimeoutInSeconds;
 
-    public DatabaseOperation(Pool<Connection> pool) {
+    DatabaseOperation(Pool<Connection> pool) {
         transactionManager = new TransactionManager(pool);
     }
 
-    // for the boilerplate code, it is mainly for performance and clear purpose, as framework code, it's more important than DRY
-    // make a lot of lambda and template pattern will make it harder to read and trace, also impact the mem usage and GC
-    int update(String sql, Object[] params) {
+    // as for the boilerplate code, it is mainly for performance and maintainability purpose, as framework code it's more important to keep straightforward than DRY
+    // it's harder to trace and read if creating a lot of lambda or template pattern, also impact the mem usage and GC
+    int update(String sql, Object... params) {
         PoolItem<Connection> connection = transactionManager.getConnection();
         try (PreparedStatement statement = connection.resource.prepareStatement(sql)) {
             statement.setQueryTimeout(queryTimeoutInSeconds);
@@ -44,7 +43,7 @@ public class DatabaseOperation {
             Connections.checkConnectionStatus(connection, e);
             throw new UncheckedSQLException(e);
         } finally {
-            transactionManager.releaseConnection(connection);
+            transactionManager.returnConnection(connection);
         }
     }
 
@@ -61,11 +60,11 @@ public class DatabaseOperation {
             Connections.checkConnectionStatus(connection, e);
             throw new UncheckedSQLException(e);
         } finally {
-            transactionManager.releaseConnection(connection);
+            transactionManager.returnConnection(connection);
         }
     }
 
-    <T> Optional<T> selectOne(String sql, RowMapper<T> mapper, Object[] params) {
+    <T> Optional<T> selectOne(String sql, RowMapper<T> mapper, Object... params) {
         validateSelectSQL(sql);
 
         PoolItem<Connection> connection = transactionManager.getConnection();
@@ -77,11 +76,11 @@ public class DatabaseOperation {
             Connections.checkConnectionStatus(connection, e);
             throw new UncheckedSQLException(e);
         } finally {
-            transactionManager.releaseConnection(connection);
+            transactionManager.returnConnection(connection);
         }
     }
 
-    <T> List<T> select(String sql, RowMapper<T> mapper, Object[] params) {
+    <T> List<T> select(String sql, RowMapper<T> mapper, Object... params) {
         validateSelectSQL(sql);
 
         PoolItem<Connection> connection = transactionManager.getConnection();
@@ -93,23 +92,29 @@ public class DatabaseOperation {
             Connections.checkConnectionStatus(connection, e);
             throw new UncheckedSQLException(e);
         } finally {
-            transactionManager.releaseConnection(connection);
+            transactionManager.returnConnection(connection);
         }
     }
 
-    Optional<Long> insert(String sql, Object[] params) {
+    Optional<Long> insert(String sql, Object[] params, String generatedColumn) {
         PoolItem<Connection> connection = transactionManager.getConnection();
-        try (PreparedStatement statement = connection.resource.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement statement = insertStatement(connection.resource, sql, generatedColumn)) {
             statement.setQueryTimeout(queryTimeoutInSeconds);
             setParams(statement, params);
             statement.executeUpdate();
+            if (generatedColumn == null) return Optional.empty();
             return fetchGeneratedKey(statement);
         } catch (SQLException e) {
             Connections.checkConnectionStatus(connection, e);
             throw new UncheckedSQLException(e);
         } finally {
-            transactionManager.releaseConnection(connection);
+            transactionManager.returnConnection(connection);
         }
+    }
+
+    private PreparedStatement insertStatement(Connection connection, String sql, String generatedColumn) throws SQLException {
+        if (generatedColumn == null) return connection.prepareStatement(sql);
+        return connection.prepareStatement(sql, new String[]{generatedColumn});
     }
 
     private void validateSelectSQL(String sql) {
@@ -153,7 +158,7 @@ public class DatabaseOperation {
         return Optional.empty();
     }
 
-    private void setParams(PreparedStatement statement, Object[] params) throws SQLException {
+    private void setParams(PreparedStatement statement, Object... params) throws SQLException {
         int index = 1;
         if (params != null) {
             for (Object param : params) {
@@ -173,7 +178,7 @@ public class DatabaseOperation {
         } else if (param instanceof LocalDateTime) {
             statement.setTimestamp(index, Timestamp.valueOf((LocalDateTime) param));
         } else if (param instanceof ZonedDateTime) {
-            statement.setTimestamp(index, new Timestamp(((ZonedDateTime) param).toInstant().toEpochMilli()));
+            statement.setTimestamp(index, Timestamp.from(((ZonedDateTime) param).toInstant()));
         } else if (param instanceof Boolean) {
             statement.setBoolean(index, (Boolean) param);
         } else if (param instanceof Long) {

@@ -1,13 +1,13 @@
 package core.framework.impl.search;
 
-import core.framework.api.search.Index;
-import core.framework.api.util.Exceptions;
-import core.framework.impl.validate.type.JAXBTypeValidator;
+import core.framework.impl.validate.type.JSONTypeValidator;
+import core.framework.search.Index;
+import core.framework.util.Exceptions;
 
 /**
  * @author neo
  */
-final class DocumentClassValidator extends JAXBTypeValidator {
+final class DocumentClassValidator extends JSONTypeValidator {
     DocumentClassValidator(Class<?> documentClass) {
         super(documentClass);
     }
@@ -17,6 +17,5 @@ final class DocumentClassValidator extends JAXBTypeValidator {
         if (path == null && !objectClass.isAnnotationPresent(Index.class)) {
             throw Exceptions.error("class must have @Index, class={}", objectClass.getCanonicalName());
         }
-        super.visitClass(objectClass, path);
     }
 }

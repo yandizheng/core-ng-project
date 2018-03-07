@@ -1,6 +1,6 @@
 package core.framework.impl.log;
 
-import core.framework.api.util.Strings;
+import core.framework.util.Strings;
 import org.slf4j.Marker;
 
 import java.io.PrintStream;
@@ -26,7 +26,8 @@ public final class LoggerImpl extends AbstractLogger {
         return builder.toString();
     }
 
-    private final PrintStream output = System.out;
+    private final PrintStream stdout = System.out;
+    private final PrintStream stderr = System.err;
     private final LogManager logManager;
     private final LogLevel infoLevel;
     private final LogLevel traceLevel;
@@ -48,8 +49,16 @@ public final class LoggerImpl extends AbstractLogger {
             logManager.process(event);
 
             if (level.value >= infoLevel.value) {
-                output.print(event.logMessage());
+                write(event);
             }
         }
+    }
+
+    private void write(LogEvent event) {
+        String message = event.logMessage();
+        if (event.level.value >= LogLevel.WARN.value)
+            stderr.print(message);
+        else
+            stdout.print(message);
     }
 }

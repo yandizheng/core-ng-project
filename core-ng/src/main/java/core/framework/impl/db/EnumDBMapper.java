@@ -1,10 +1,10 @@
 package core.framework.impl.db;
 
-import core.framework.api.db.DBEnumValue;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
+import core.framework.db.DBEnumValue;
+import core.framework.impl.reflect.Enums;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
 
-import java.lang.reflect.Field;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -12,30 +12,25 @@ import java.util.Map;
  * @author neo
  */
 final class EnumDBMapper {
-    private final Map<Class<? extends Enum<?>>, Map<Enum<?>, String>> enumToDBValueMappings = Maps.newHashMap();
+    private final Map<Class<? extends Enum<?>>, Map<Enum<?>, String>> mappings = Maps.newHashMap();
 
     <T extends Enum<?>> void registerEnumClass(Class<T> enumClass) {
-        if (!enumToDBValueMappings.containsKey(enumClass)) {
-            T[] constants = enumClass.getEnumConstants();
+        if (!mappings.containsKey(enumClass)) {
             @SuppressWarnings({"unchecked", "rawtypes"})
-            Map<Enum<?>, String> mappings = new EnumMap(enumClass);
+            Map<Enum<?>, String> mapping = new EnumMap(enumClass);
+            T[] constants = enumClass.getEnumConstants();
             for (T constant : constants) {
-                try {
-                    Field field = enumClass.getField(constant.name());
-                    String dbValue = field.getDeclaredAnnotation(DBEnumValue.class).value();
-                    mappings.put(constant, dbValue);
-                } catch (NoSuchFieldException e) {
-                    throw new Error(e);
-                }
+                String dbValue = Enums.constantAnnotation(constant, DBEnumValue.class).value();
+                mapping.put(constant, dbValue);
             }
-            enumToDBValueMappings.put(enumClass, mappings);
+            mappings.put(enumClass, mapping);
         }
     }
 
-    String getDBValue(Enum<? extends Enum<?>> value) {
+    String getDBValue(Enum<?> value) {
         @SuppressWarnings("unchecked")
         Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) value.getClass();
-        Map<?, String> mapping = enumToDBValueMappings.get(enumClass);
+        Map<Enum<?>, String> mapping = mappings.get(enumClass);
         if (mapping == null)
             throw Exceptions.error("enum class is not registered, register in module by db().view() or db().repository(), enumClass={}", enumClass.getCanonicalName());
         return mapping.get(value);  // this won't return null since all fields of enum are registered

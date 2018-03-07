@@ -1,8 +1,8 @@
 package core.framework.impl.mongo;
 
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.util.Sets;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.util.Sets;
 import org.bson.codecs.Codec;
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
@@ -38,7 +38,7 @@ public final class EntityCodecs {
     private <T> void register(Class<T> entityClass, EntityIdHandler<T> idHandler) {
         EntityEncoderBuilder<T> builder = new EntityEncoderBuilder<>(entityClass);
         EntityEncoder<T> entityEncoder = builder.build();
-        enumClasses.addAll(builder.enumClasses);
+        enumClasses.addAll(builder.enumCodecFields.keySet());
         EntityDecoder<T> entityDecoder = new EntityDecoderBuilder<>(entityClass).build();
         EntityCodec<T> codec = new EntityCodec<>(entityClass, idHandler, entityEncoder, entityDecoder);
         Codec<?> previous = codecs.putIfAbsent(entityClass, codec);

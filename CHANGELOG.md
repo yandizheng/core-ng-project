@@ -1,9 +1,189 @@
 ## Change log
-### 4.12.4 (5/15/2017 - )
+### 6.0.0 (3/4/2018 - 3/6/2018)     !!! only support Java 9+
+* jdk: drop java 8 support
+* log: removed write action/trace to file, updated sys.properties log key to sys.log.appender
+        sys.log.appender=console => write action/trace to console
+        sys.log.appender=kafkaURI => forward log to kafka
+       (in cloud env, console logging is prefered no matter it's docker or systemd/journald, or use log forwarding) 
+* http: update undertow to 2.0.1
+
+### 5.3.8 (2/28/2018 - 3/4/2018)    !!! 5.3.X is last version to support Java 8
+* http: limit max requestURL length to 1000
+* search: update es to 6.2.2
+
+### 5.3.7 (2/24/2018 - 2/27/2018)
+* http: not handling /health-check as action anymore, means /health-check will not be part of action log, to reduce noisy in kube env
+* httpClient: removed HTTPRequest static method shortcut, use new HTTPRequest(method, uri) instead, to enforce consistent api style 
+* api: tweak api generation
+
+### 5.3.6 (2/14/2018 - 2/20/2018)
+* redis: support increaseBy
+* api: tweak api generation to fit client impl, refer to https://github.com/neowu/frontend-demo-project/blob/master/website-frontend-ts/src/service/user.ts as example
+
+### 5.3.5 (2/12/2018 - 2/14/2018)
+* inject: bind(object) will inject object, to make it easier to register bean with both manual wired and autowired dependencies
+* properties: removed support of loading properties from file path, for kube we will using env/jvm argument overriding
+* httpClient: add basic auth support
+* search: update es to 6.2.1
+
+### 5.3.4 (2/5/2018 - 2/11/2018)
+* http: add ContentType.IMAGE_PNG constant, (e.g. used by captcha controller)
+* api: change returned content type to javascript, make it easier to view by browser
+* test: removed core.framework.test.EnvWebValidator, since all static file/content will be handled in frontend project, copy the impl to your own project if you still need
+* http: set max entity size to 10M, to prevent from large post body
+* http: support text/xml as body
+* http: change ip whitelist to cidr to support subnet
+
+### 5.3.3 (2/1/2018 - 2/4/2018)
+* api: support configure api client timeout and slow operation threshold (default is 30s and 15s)
+* log: add redis read/write entries tracking, index read/write entries as null if not set  
+* search: update es to 6.1.3
+* api: add "_sys/api" to return typescript definition, used by frontend
+
+### 5.3.2 (1/29/2018 - 2/1/2018)
+* html: added "autofocus", "allowfullscreen", "hidden" & "async" to boolean attributes
+* api: remove openapi impl, not useful in actual development life cycle, we plan to impl tool to generate typescript ajax client from interface directly 
+* api: temporary removed: update API client with 30s timeout and 15s slow operation threshold (will support configure in next version)
+
+### 5.3.1 (1/28/2018 - 1/29/2018)
+* search: update es to 6.1.2
+* html: added "required", "sortable" to boolean attributes
+
+### 5.3.0 (1/22/2018 - 1/23/2018)
+* http: added gzip support, added cache param for static content 
+* api: update API client with 30s timeout and 15s slow operation threshold
+
+### 5.2.10 (1/15/2018 - 1/17/2018)
+* http: support ip whitelist(due to gcloud public LB does not support ingress IP restriction), update undertow to 1.4.22
+* db: change mysql jdbc driver to com.mysql.cj.jdbc.Driver (works with mysql:mysql-connector-java:6.0.6), old one is deprecated, https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-api-changes.html
+* test: update junit to 5.0.3 and tweak dependency
+
+### 5.2.9 (12/26/2017 - 1/10/2018)
+* search: update es to 6.1.1
+* http: support patch method, for partial update webservice, e.g. update status for one entity
+
+### 5.2.8.1 (12/20/2017)
+* jdk: republish with jdk 8, due to https://github.com/neowu/core-ng-project/issues/8
+
+### 5.2.8 (12/20/2017)
+* property: when override property with env var, convert key with upper case and replace '.' with '_', e.g. "sys.kafka.uri" to "SYS_KAFKA_URI", 
+    due to dot is not supported by POSIX, especially not supported by alpine 3.6, https://bugs.alpinelinux.org/issues/7344 
+
+### 5.2.7 (12/11/2017 - 12/19/2017)
+* property: allow all the properties can be override by env var (mount by kubernetes/docker) or system property (via -Dkey=value)
+* search: update es to 6.1.0, disable zen for integration test
+
+### 5.2.6 (12/05/2017 - 12/11/2017)
+* db: fixed ZonedDateTime saves to DB with nano precision
+* search: update es to 6.0.1
+* api: support /_sys/api, can be used by http://editor.swagger.io/ to generate OpenAPI doc
+
+### 5.2.5 (11/21/2017 - 12/04/2017)
+* test: replace hamcrest with assertj
+* http: in local dev env, allow developer to run multiple apps on different port, either put -Dsys.http.port=8080 in Intellij Run configuration, or ./gradlew -Dsys.http.port=8080 :some-service:run
+
+### 5.2.4 (11/20/2017 - 11/20/2017)
+* test: update junit to 5.0.2
+* bug: fixing elasticsearch client does not need EsExecutors.PROCESSORS_SETTING settings   
+
+### 5.2.3 (11/17/2017 - 11/20/2017)
+* sys: added Threads.availableProcessors() to allow use -Dcore.availableProcessors to specify cpu core to be used 
+        due to in docker/kubenetes env, Runtime.getRuntime().availableProcessors() always return number of cores from host, not cpu limited by cgroup (-cpus or limit.cpus).
+* json: support empty object
+
+### 5.2.2 (11/14/2017 - 11/15/2017)
+* log: console logger writes to stderr for WARN/ERROR, this is to help kubernetes logger driver to classify log severity, e.g. stackdriver in gcloud   
+* search: update es to 6.0.0
+
+### 5.2.1 (11/8/2017 - 11/13/2017)
+* log: log-processor collects its own cpu/heap/kafka stats to index
+* log: ActionLogContext.stat() supports adding up
+* log: ActionLogContext.track() tracks I/O reads and writes for heavy backend db, such as DB/Mongo/ES
+* web: put max forwarded ips config to prevent from x-forwarded-for clientIp spoofing
+        http().maxForwardedIPs() 
+* search: update es to 5.6.4        
+
+### 5.2.0 (10/28/2017 - 11/7/2017)
+* bean: removed "javax.inject:javax.inject:1", replaced with core.framework.inject, removed constructor injection support (to simplify and prepare for JDK 9) 
+* jdk: make built target compatible with JDK 9, as first step of java 9 migration (some of toolchain does not support java 9 yet) 
+* kafka: update to 1.0.0
+* pool: monitor pool size for both db and redis/cache/session
+
+### 5.1.1 (10/17/2017 - 10/27/2017)
+* pool: refactor and simplify resource pool
+* web: @QueryParam bean validation to disallow @Property
+* httpClient: changed httpClient to interface, to make it easier to mock/override binding, change HTTPRequest to bean style from builder style
+              you need to update the binding to "bind(HTTPClient.class, new HTTPClientBuilder().build())"              
+* redis: replaced jedis impl with minimal support
+        we only need to support request/response/pipeline model, and due to we manage resource pool, cluster support requires customization anyway
+* check: replace findbugs with spotbugs
+
+### 5.1.0 (10/13/2017 - 10/16/2017)
+* test: updated to junit 5, for old tests before upgrading API, add following dependency 'junit:junit:4.12' 'org.junit.vintage:junit-vintage-engine:4.12.1'
+        for integration test use "@ExtendWith(IntegrationExtension.class)" instead of @RunWith
+* search: update es to 5.6.3
+
+### 5.0.0 (10/13/2017)
+* api: remove jaxb dependency, use our own @Property instead (jaxb will be deprecated by jdk9 and it has unnecessary java.desktop module dependency)
+* package: move core.framework.api from core-ng lib to core.framework, due to with JDK 9, package must be unique to export across all libs, this is to prepare for JDK 9 modules
+
+### 4.16.4 (10/2/2017 - 10/13/2017)
+* web: enable http2 support
+* web: simplified ControllerInspector, to only support JDK 1.8.0_60 or later
+* lib: update javaassist to 3.22, kafka to 0.11.0.1
+
+### 4.16.3 (9/5/2017 - 9/30/2017)
+* mongo: tweak mongo encoder and decoder code gen   
+* http: update undertow to 1.4.20, tweak the cookies config
+* search: update es to 5.6.2
+* web: simplified Response interface, use chained method to set content-type and status going forward
+
+### 4.16.2 (9/1/2017 - 9/4/2017)
+* bug: fix oracle pagination query param value
+
+### 4.16.1 (8/29/2017 - 9/1/2017)
+* validate: replace validation impl with dynamic code generation
+* kafka: combine json reader/validator into handler, since one topic can only have one message class and there is no rabbitMQ anymore
+* test: added EnumConversionValidator to facilitate verifying view enum to domain enum conversion
+
+### 4.16.0 (8/23/2017 - 8/29/2017)
+* api: add validation for GET/DELETE body type
+* web: added @QueryParam support to replace flat JAXB bean for GET/DELETE
+
+### 4.15.0 (8/17/2017 - 8/22/2017)
+* queue: removed rabbitMQ support, make kafka only queue implementation
+* search: update es to 5.5.2
+* web: support @ResponseStatus on exception class, to simplify default error response handling
+* web: updated request parser to determine port with x-forwarded-proto aware, (due to google cloud level 7 lb does not forward x-forwarded-port)
+
+### 4.14.0 (8/11/2017 - 8/16/2017)
+* mongo: update driver to 3.5, and its new builtin POJO impl should be slower than coreng due to reflection, so we still keep EntityCodec
+* db: replaced repository.select(Query) with Query repository.select() to support dynamic query with pagination
+
+### 4.13.0 (8/4/2017 - 8/11/2017)
+* web: Response.file(File) changed to Response.file(Path) to be consistent with entire api design, (to return path via WebDirectory)  
+* json: update jackson to 2.9.0, simplified configuration
+* scheduler: add secondly trigger, to support precisely scheduling to align with clock time 
+
+### 4.12.7 (8/1/2017 - 8/3/2017)
+* search: update es to 5.5.1
+* db: update insertQuery to use prepareStatement(String sql, String columnNames[]), to adapt to both mysql, oracle and potentially postgreSQL
+
+### 4.12.6 (7/26/2017 - 7/30/2017)
+* db: support oracle db insert with sequence
+
+### 4.12.5 (6/13/2017 - 7/26/2017)
+* search: update es to 5.5.0
+* kafka: update to 0.11.0.0, use built-in headers for meta data
+
+### 4.12.4 (5/15/2017 - 6/13/2017)
 * test: validate override binding in integration test
+* lib: update es to 5.4.1, fongo to 2.1.0
+* web: forbidden inherited controller 
+* html: recommend to use double quote to delimit attribute value
 
 ### 4.12.3 (5/9/2017 - 5/10/2017)
-* es: update to 5.4.0, delete by query support
+* search: update es to 5.4.0, delete by query support
 * httpclient: changed to disable redirect by default, support to enable redirect handling
 * httpclient: added 302 Found status
 
@@ -20,7 +200,7 @@
 * scheduler: daily/weekly/monthly supports timezone
 
 ### 4.11.2 (4/3/2017 - 4/4/2017)
-* es: update to 5.3.0
+* search: update es to 5.3.0
 * db: fix to support ZonedDateTime
 * site: enable security headers, X-Frame-Options, X-XSS-Protection, X-Content-Type-Options
 
@@ -100,11 +280,11 @@
 * mongo: support bulk replace, update driver to 3.4.1
 
 ### 4.8.7 (12/12/2016 - 1/3/2017)
-* es: update es to 5.1.1
+* search: update es to 5.1.1
 * mongo: support bulk insert
 * kafka: add kafka support in order to replace rabbitMQ
 * properties: add _sys property controller for troubleshooting
-* properties/config: allow load properties from file path, for kube/docker support
+* properties: allow load properties from file path, for kube/docker support
 
 ### 4.8.6 (12/6/2016)
 * http: change https redirection to 301 instead of 308
@@ -114,11 +294,11 @@
 * redis: update jedis to 2.9.0
 
 ### 4.8.4 (11/16/2016 - 12/1/2016)
-* es: update es to 5.0.2
+* search: update es to 5.0.2
 * http: added https with self signed cert support, make http/https port configurable
 
 ### 4.8.3 (10/27/2016 - 11/16/2016)
-* es: update es to 5.0.0
+* search: update es to 5.0.0
 * log: removed rabbitmq log forward support
 * session: replace redis impl with HASH, to make it easier to manage and share between multiple apps
 * web: fix path param to decode %2F to '/', (disabled undertow decodeURL completely)
@@ -141,7 +321,7 @@
 ### 4.7.8 (9/15/2016 - 10/17/2016)
 * lib: update undertow to 1.4.3
 * http: url param supports boolean
-* es: update esTookTime to nano seconds
+* search: update esTookTime to nano seconds
 * mockito: update mockito to 2.1
 * queue: start supporting kafka
 * mongo: removed eval() support
@@ -156,9 +336,9 @@
 * session: change session data encoding to JSON
 
 ### 4.7.5 (9/7/2016 - 9/8/2016)
-* es: update jackson lib and es lib to match latest
+* search: update jackson lib and es lib to match latest
 * json: remove optional field support, which is not useful, only support Optional<T> as return object
-* es: update client to enable sniff
+* search: update client to enable sniff
 
 ### 4.7.4 (8/31/2016 - 9/1/2016)
 * mongo: updated driver to 3.3.0
@@ -180,7 +360,7 @@
 * test: support MockExecutor
 
 ### 4.6.9 (7/11/2016 - 8/1/2016)
-* elasticsearch: support bulkDelete
+* search: support bulkDelete
 * redis: support hget
 
 ### 4.6.8 (7/6/2016)
@@ -202,9 +382,9 @@
 * hash: added SHA1 SHA256 support
 
 ### 4.6.2 (6/22/2016 - 6/23/2016)
-* elasticsearch: remove groovy test support, actually script query is never useful, not plan to use anymore
+* search: remove groovy test support, actually script query is never useful, not plan to use anymore
 * mock: mockRedis supports all operations
-* elasticsearch: support foreach for reindex support
+* search: support foreach for reindex support
 
 ### 4.6.1 (6/22/2016)
 * httpclient: ContentType.parse supports to ignore illegal charset
@@ -281,7 +461,7 @@
 
 ### 4.4.1 (4/8/2016)
 * http: update httpclient request to accept ContentType
-* es: update to 2.3.1
+* search: update es to 2.3.1
 * httpclient: throw HTTPClientException for invalid url
 
 ### 4.4.0 (4/7/2016)
@@ -294,7 +474,7 @@
 
 ### 4.3.8 (3/31/2016)
 * hmac: changed input from String to bytes
-* es: update to 2.3.0
+* search: update es to 2.3.0
 
 ### 4.3.7 (3/30/2016)
 * validate: add @ValuePattern
@@ -309,7 +489,7 @@
 * log: actionLogContext.put checks duplication to avoid huge trace log
 
 ### 4.3.3 (3/23/2016 - 3/25/2016)
-* es: update es to 2.2.1
+* search: update es to 2.2.1
 * web: for file response, close exchange when end
 
 ### 4.3.2 (3/18/2016)
@@ -411,7 +591,7 @@
 
 ### 4.1.0 (2/4/2016)
 * template: invalid url attr will write src="", container will write empty if content is null
-* elasticsearch: support 2.2.0, load groovy plugin in test context
+* search: support 2.2.0, load groovy plugin in test context
 
 ### 4.0.9 (2/3/2016)
 * redis: loose slow_redis warning threshold and timeout, on busy server due to CPU context switch, it's relative easy to hit it
@@ -429,7 +609,7 @@
 
 ### 4.0.5 (1/22/2016)
 * log: make 3rd party log level to info, (e.g. ES log sampler error by INFO level in separated thread)
-* elasticsearch: set ping timeout, support dynamic index name (for alias or time serial index name)
+* search: set ping timeout, support dynamic index name (for alias or time serial index name)
 
 ### 4.0.4 (1/21/2016)
 * fix: typo in @NotEmpty/@ValueNotEmpty
@@ -457,7 +637,7 @@
 * httpclient: fix NPE with HttpEntity is null on 204
 
 ### 3.9.10 (1/5/2016)
-* elasticsearch: ignore cluster name for transport client
+* search: ignore cluster name for transport client
 
 ### 3.9.9 (12/31/2015)
 * url: encode '+' for path segment to keep compatible with other impl, e.g. undertow, AWS S3
@@ -478,7 +658,7 @@
 * log: moved ErrorCode to core.framework.api.log.ErrorCode
 
 ### 3.9.4 (12/10/2015 - 12/14/2015)
-* elasticsearch: update to 2.1.0
+* search: update ES to 2.1.0
 * log: restructure trace/warning log, for prod log aggregation
 
 ### 3.9.3 (12/9/2015)
@@ -728,7 +908,7 @@
 * log: update log-processor ES mappings
 
 ### 3.3.9 (8/13/2015)
-* ES: API changed to provide more flexibility to operate index and type
+* search: API changed to provide more flexibility to operate index and type
 * log: draft of trace log forwarding
 * http: fix put/post without content-type
 

@@ -1,13 +1,13 @@
 package core.log.service;
 
-import core.framework.api.search.BulkIndexRequest;
-import core.framework.api.search.ElasticSearchType;
-import core.framework.api.search.IndexRequest;
-import core.framework.api.util.Maps;
-import core.framework.impl.log.queue.StatMessage;
+import core.framework.impl.log.message.StatMessage;
+import core.framework.inject.Inject;
+import core.framework.search.BulkIndexRequest;
+import core.framework.search.ElasticSearchType;
+import core.framework.search.IndexRequest;
+import core.framework.util.Maps;
 import core.log.domain.StatDocument;
 
-import javax.inject.Inject;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -24,14 +24,15 @@ public class StatService {
         index(messages, now);
     }
 
-    private void index(List<StatMessage> messages, LocalDate now) {
+    public void index(StatMessage message) {
+        LocalDate now = LocalDate.now();
+        index(message, now);
+    }
+
+    void index(List<StatMessage> messages, LocalDate now) {
         if (messages.size() <= 5) { // use single index in quiet time
             for (StatMessage message : messages) {
-                IndexRequest<StatDocument> request = new IndexRequest<>();
-                request.index = IndexName.name("stat", now);
-                request.id = message.id;
-                request.source = stat(message);
-                statType.index(request);
+                index(message, now);
             }
         } else {
             Map<String, StatDocument> stats = Maps.newHashMapWithExpectedSize(messages.size());
@@ -43,6 +44,14 @@ public class StatService {
             request.sources = stats;
             statType.bulkIndex(request);
         }
+    }
+
+    private void index(StatMessage message, LocalDate now) {
+        IndexRequest<StatDocument> request = new IndexRequest<>();
+        request.index = IndexName.name("stat", now);
+        request.id = message.id;
+        request.source = stat(message);
+        statType.index(request);
     }
 
     private StatDocument stat(StatMessage message) {

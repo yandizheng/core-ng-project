@@ -1,9 +1,9 @@
 package core.framework.impl.web.route;
 
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.util.Strings;
 import core.framework.impl.web.request.PathParams;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.util.Strings;
 
 import java.util.Map;
 
@@ -24,7 +24,7 @@ class PathNode {
         if (currentPath == null) {
             if (handler == null) handler = new URLHandler(pathPattern);
             return handler;
-        } else if (currentPath.value.startsWith(":")) {
+        } else if (Strings.startsWith(currentPath.value, ':')) {
             int paramIndex = currentPath.value.indexOf('(');
             int endIndex = paramIndex > 0 ? paramIndex : currentPath.value.length();
             String name = currentPath.value.substring(1, endIndex);

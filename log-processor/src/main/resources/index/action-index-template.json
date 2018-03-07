@@ -1,5 +1,5 @@
 {
-  "template": "action-*",
+  "index_patterns": "action-*",
   "order": 1,
   "settings": {
     "number_of_shards": 1,
@@ -10,9 +10,6 @@
   },
   "mappings": {
     "action": {
-      "_all": {
-        "enabled": false
-      },
       "dynamic_templates": [
         {
           "context": {
@@ -44,6 +41,22 @@
             "path_match": "perf_stats.*.total_elapsed",
             "mapping": {
               "type": "long"
+            }
+          }
+        },
+        {
+          "perf_stats.read_entries": {
+            "path_match": "perf_stats.*.read_entries",
+            "mapping": {
+              "type": "integer"
+            }
+          }
+        },
+        {
+          "perf_stats.write_entries": {
+            "path_match": "perf_stats.*.write_entries",
+            "mapping": {
+              "type": "integer"
             }
           }
         }

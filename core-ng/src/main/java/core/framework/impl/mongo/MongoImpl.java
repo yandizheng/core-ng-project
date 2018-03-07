@@ -4,11 +4,11 @@ import com.mongodb.MongoClient;
 import com.mongodb.MongoClientOptions;
 import com.mongodb.MongoClientURI;
 import com.mongodb.client.MongoDatabase;
-import core.framework.api.mongo.Collection;
-import core.framework.api.mongo.Mongo;
-import core.framework.api.mongo.MongoCollection;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.StopWatch;
+import core.framework.mongo.Collection;
+import core.framework.mongo.Mongo;
+import core.framework.mongo.MongoCollection;
+import core.framework.util.Exceptions;
+import core.framework.util.StopWatch;
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.slf4j.Logger;
@@ -24,11 +24,10 @@ public class MongoImpl implements Mongo {
     private final Logger logger = LoggerFactory.getLogger(MongoImpl.class);
     private final MongoClientOptions.Builder builder = MongoClientOptions.builder()
                                                                          .maxConnectionIdleTime((int) Duration.ofMinutes(30).toMillis())
-                                                                         .socketKeepAlive(true)
                                                                          .cursorFinalizerEnabled(false); // framework always close db cursor
     public MongoClientURI uri;
+    public int tooManyRowsReturnedThreshold = 2000;
     int timeoutInMs = (int) Duration.ofSeconds(15).toMillis();
-    int tooManyRowsReturnedThreshold = 2000;
     long slowOperationThresholdInNanos = Duration.ofSeconds(5).toNanos();
     CodecRegistry registry;
     private MongoClient mongoClient;
@@ -106,10 +105,6 @@ public class MongoImpl implements Mongo {
         } finally {
             logger.info("register mongo view, viewClass={}, elapsedTime={}", viewClass.getCanonicalName(), watch.elapsedTime());
         }
-    }
-
-    public void tooManyRowsReturnedThreshold(int tooManyRowsReturnedThreshold) {
-        this.tooManyRowsReturnedThreshold = tooManyRowsReturnedThreshold;
     }
 
     public void slowOperationThreshold(Duration threshold) {

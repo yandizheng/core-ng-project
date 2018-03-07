@@ -1,10 +1,9 @@
 package core.framework.impl.web.management;
 
-import core.framework.api.http.ContentType;
-import core.framework.api.util.Properties;
-import core.framework.api.web.Controller;
-import core.framework.api.web.Request;
-import core.framework.api.web.Response;
+import core.framework.impl.module.PropertyManager;
+import core.framework.web.Controller;
+import core.framework.web.Request;
+import core.framework.web.Response;
 
 import java.util.Set;
 import java.util.TreeSet;
@@ -13,30 +12,25 @@ import java.util.TreeSet;
  * @author neo
  */
 public class PropertyController implements Controller {
-    private final Properties properties;
+    private final PropertyManager propertyManager;
 
-    public PropertyController(Properties properties) {
-        this.properties = properties;
+    public PropertyController(PropertyManager propertyManager) {
+        this.propertyManager = propertyManager;
     }
 
     @Override
-    public Response execute(Request request) throws Exception {
-        ControllerHelper.validateFromLocalNetwork(request.clientIP());
-
-        StringBuilder builder = new StringBuilder();
-        Set<String> keys = new TreeSet<>(properties.keys());    // sort by key
-        for (String key : keys) {
-            builder.append(key);
-            if (mask(key)) {
-                builder.append("=(masked)\n");
-            } else {
-                builder.append('=').append(properties.get(key).orElse("")).append('\n');
-            }
-        }
-        return Response.text(builder.toString(), ContentType.TEXT_PLAIN);
+    public Response execute(Request request) {
+        ControllerHelper.assertFromLocalNetwork(request.clientIP());
+        return Response.text(text());
     }
 
-    private boolean mask(String key) {
-        return key.contains("password") || key.contains("secret");
+    String text() {
+        StringBuilder builder = new StringBuilder();
+        Set<String> keys = new TreeSet<>(propertyManager.properties.keys());   // sort by key
+        for (String key : keys) {
+            String value = propertyManager.property(key).orElse("");
+            builder.append(key).append('=').append(propertyManager.maskValue(key, value)).append('\n');
+        }
+        return builder.toString();
     }
 }

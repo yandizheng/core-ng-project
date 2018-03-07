@@ -1,7 +1,7 @@
 package core.framework.impl.module;
 
-import core.framework.api.util.Lists;
-import core.framework.api.util.Randoms;
+import core.framework.util.Lists;
+import core.framework.util.Randoms;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +23,7 @@ public class BackgroundTaskExecutor {
 
     public void start() {
         for (BackgroundTask task : tasks) {
-            Duration delay = Duration.ofMillis((long) Randoms.number(8000, 15000)); // delay 8s to 15s
+            Duration delay = Duration.ofMillis((long) Randoms.number(5000, 10000)); // delay 5s to 10s
             scheduler.scheduleWithFixedDelay(task, delay.toMillis(), task.rate.toMillis(), TimeUnit.MILLISECONDS);
         }
         logger.info("background task executor started");
@@ -49,9 +49,9 @@ public class BackgroundTaskExecutor {
     }
 
     private static class BackgroundTask implements Runnable {
+        final Duration rate;
         private final Logger logger = LoggerFactory.getLogger(BackgroundTask.class);
         private final Runnable command;
-        private final Duration rate;
 
         BackgroundTask(Runnable command, Duration rate) {
             this.command = command;
@@ -63,7 +63,7 @@ public class BackgroundTaskExecutor {
             try {
                 command.run();
             } catch (Throwable e) {
-                logger.warn("failed to run background task, error=" + e.getMessage(), e);
+                logger.warn("failed to run background task, error={}", e.getMessage(), e);
             }
         }
     }

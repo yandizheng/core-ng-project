@@ -1,10 +1,10 @@
 package core.framework.impl.web.session;
 
-import core.framework.api.util.Exceptions;
-import core.framework.api.web.CookieSpec;
-import core.framework.api.web.Response;
-import core.framework.api.web.Session;
 import core.framework.impl.web.request.RequestImpl;
+import core.framework.util.Exceptions;
+import core.framework.web.CookieSpec;
+import core.framework.web.Response;
+import core.framework.web.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,12 +66,12 @@ public final class SessionManager {
     }
 
     public void timeout(Duration timeout) {
-        if (timeout == null) throw Exceptions.error("timeout must not be null");
+        if (timeout == null) throw new Error("timeout must not be null");
         this.timeout = timeout;
     }
 
     public void cookie(String name, String domain) {
-        if (name == null) throw Exceptions.error("name must not be null");
+        if (name == null) throw new Error("name must not be null");
         sessionId = new CookieSpec(name).domain(domain).path("/").sessionScope().httpOnly().secure();
     }
 }

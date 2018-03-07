@@ -18,7 +18,13 @@ public class ProducerMetrics implements Metrics {
         this.name = name;
     }
 
-    public void setMetrics(Map<MetricName, ? extends Metric> kafkaMetrics) {
+    @Override
+    public void collect(Map<String, Double> stats) {
+        if (requestRate != null) stats.put(statName("request_rate"), (Double) requestRate.metricValue());
+        if (outgoingByteRate != null) stats.put(statName("outgoing_byte_rate"), (Double) outgoingByteRate.metricValue());
+    }
+
+    public void set(Map<MetricName, ? extends Metric> kafkaMetrics) {
         for (Map.Entry<MetricName, ? extends Metric> entry : kafkaMetrics.entrySet()) {
             MetricName name = entry.getKey();
             if ("producer-metrics".equals(name.group())) {
@@ -26,12 +32,6 @@ public class ProducerMetrics implements Metrics {
                 else if ("outgoing-byte-rate".equals(name.name())) outgoingByteRate = entry.getValue();
             }
         }
-    }
-
-    @Override
-    public void collect(Map<String, Double> stats) {
-        if (requestRate != null) stats.put(statName("request_rate"), requestRate.value());
-        if (outgoingByteRate != null) stats.put(statName("outgoing_byte_rate"), outgoingByteRate.value());
     }
 
     private String statName(String statName) {

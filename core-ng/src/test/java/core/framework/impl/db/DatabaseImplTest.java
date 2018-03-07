@@ -1,57 +1,63 @@
 package core.framework.impl.db;
 
-import core.framework.api.db.Transaction;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import core.framework.db.Transaction;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author neo
  */
-public class DatabaseImplTest {
-    private static DatabaseImpl database;
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class DatabaseImplTest {
+    private DatabaseImpl database;
 
-    @BeforeClass
-    public static void createDatabase() {
-        database = new DatabaseImpl();
+    @BeforeAll
+    void createDatabase() {
+        database = new DatabaseImpl("db");
         database.url("jdbc:hsqldb:mem:.;sql.syntax_mys=true");
         database.view(EntityView.class);
 
-        database.execute("CREATE TABLE database_test (id INT PRIMARY KEY, string_field VARCHAR(20), enum_field VARCHAR(10))");
+        database.execute("CREATE TABLE database_test (id INT PRIMARY KEY, string_field VARCHAR(20), enum_field VARCHAR(10), date_field DATE, date_time_field TIMESTAMP)");
     }
 
-    @AfterClass
-    public static void cleanupDatabase() {
+    @AfterAll
+    void cleanupDatabase() {
         database.execute("DROP TABLE database_test");
     }
 
-    @Before
-    public void truncateTable() {
+    @BeforeEach
+    void truncateTable() {
         database.execute("TRUNCATE TABLE database_test");
     }
 
     @Test
-    public void selectOneWithView() {
-        database.execute("INSERT INTO database_test VALUES (?, ?, ?)", 1, "string", TestEnum.V1);
+    void selectOneWithView() {
+        insertRow(1, "string1", TestEnum.V1);
 
         EntityView view = database.selectOne("SELECT string_field as string_label, enum_field as enum_label FROM database_test where id = ?", EntityView.class, 1).get();
 
-        assertEquals("string", view.stringField);
+        assertEquals("string1", view.stringField);
         assertEquals(TestEnum.V1, view.enumField);
     }
 
     @Test
-    public void selectWithView() {
-        database.execute("INSERT INTO database_test VALUES (?, ?, ?)", 1, "string", TestEnum.V1);
-        database.execute("INSERT INTO database_test VALUES (?, ?, ?)", 2, "string", TestEnum.V2);
+    void selectWithView() {
+        insertRow(1, "string1", TestEnum.V1);
+        insertRow(2, "string2", TestEnum.V2);
 
         List<EntityView> views = database.select("SELECT string_field as string_label, enum_field as enum_label FROM database_test", EntityView.class);
 
@@ -61,29 +67,50 @@ public class DatabaseImplTest {
     }
 
     @Test
-    public void selectEmptyWithView() {
+    void selectEmptyWithView() {
         List<EntityView> views = database.select("SELECT string_field, enum_field FROM database_test where id = -1", EntityView.class);
 
         assertTrue(views.isEmpty());
     }
 
     @Test
-    public void selectNullInt() {
+    void selectNullInt() {
         Optional<Integer> result = database.selectOne("SELECT max(id) FROM database_test", Integer.class);
         assertFalse(result.isPresent());
     }
 
     @Test
-    public void selectInt() {
-        Optional<Integer> result = database.selectOne("SELECT count(id) FROM database_test", Integer.class);
-        assertTrue(result.isPresent());
-        assertEquals(0, result.get().intValue());
+    void selectNumber() {
+        assertEquals(0, database.selectOne("SELECT count(id) FROM database_test", Integer.class).get().intValue());
+        assertEquals(0, database.selectOne("SELECT count(id) FROM database_test", Long.class).get().longValue());
+        assertEquals(0, database.selectOne("SELECT count(id) FROM database_test", Double.class).get().doubleValue());
+        assertEquals(BigDecimal.ZERO, database.selectOne("SELECT count(id) FROM database_test", BigDecimal.class).get());
     }
 
     @Test
-    public void commitTransaction() {
+    void selectDate() {
+        LocalDate date = LocalDate.of(2017, 11, 22);
+        LocalDateTime dateTime = LocalDateTime.of(2017, 11, 22, 13, 0, 0);
+        database.execute("INSERT INTO database_test (id, date_field, date_time_field) VALUES (?, ?, ?)", 1, date, dateTime);
+
+        assertEquals(date, database.selectOne("SELECT date_field FROM database_test where id = ?", LocalDate.class, 1).get());
+        assertEquals(dateTime, database.selectOne("SELECT date_time_field FROM database_test where id = ?", LocalDateTime.class, 1).get());
+        assertEquals(dateTime, database.selectOne("SELECT date_time_field FROM database_test where id = ?", ZonedDateTime.class, 1).get().toLocalDateTime());
+    }
+
+    @Test
+    void selectString() {
+        insertRow(1, "string1", TestEnum.V1);
+
+        Optional<String> result = database.selectOne("SELECT string_field FROM database_test", String.class);
+        assertTrue(result.isPresent());
+        assertEquals("string1", result.get());
+    }
+
+    @Test
+    void commitTransaction() {
         try (Transaction transaction = database.beginTransaction()) {
-            database.execute("INSERT INTO database_test VALUES (?, ?, ?)", 1, "string", TestEnum.V1);
+            insertRow(1, "string", TestEnum.V1);
             transaction.commit();
         }
 
@@ -92,13 +119,17 @@ public class DatabaseImplTest {
     }
 
     @Test
-    public void rollbackTransaction() {
+    void rollbackTransaction() {
         try (Transaction transaction = database.beginTransaction()) {
-            database.execute("INSERT INTO database_test VALUES (?, ?, ?)", 1, "string", TestEnum.V1);
+            insertRow(1, "string", TestEnum.V1);
             transaction.rollback();
         }
 
         Optional<EntityView> result = database.selectOne("SELECT string_field, enum_field FROM database_test where id = ?", EntityView.class, 1);
         assertFalse(result.isPresent());
+    }
+
+    private void insertRow(int id, String stringField, TestEnum enumField) {
+        database.execute("INSERT INTO database_test (id, string_field, enum_field) VALUES (?, ?, ?)", id, stringField, enumField);
     }
 }

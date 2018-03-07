@@ -1,14 +1,14 @@
 package core.log.job;
 
-import core.framework.api.scheduler.Job;
-import core.framework.api.search.ElasticSearch;
-import core.framework.api.search.ElasticSearchIndex;
-import core.framework.api.search.SearchException;
+import core.framework.inject.Inject;
+import core.framework.scheduler.Job;
+import core.framework.search.ElasticSearch;
+import core.framework.search.ElasticSearchIndex;
+import core.framework.search.SearchException;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.inject.Inject;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -26,12 +26,23 @@ public class CleanupOldIndexJob implements Job {
     ElasticSearch elasticSearch;
 
     @Override
-    public void execute() throws Exception {
+    public void execute() {
         LocalDate now = LocalDate.now();
 
+        cleanup(now);
+    }
+
+    void cleanup(LocalDate now) {
         List<ElasticSearchIndex> indices = elasticSearch.indices();
         for (ElasticSearchIndex index : indices) {
-            process(index, now);
+            createdDate(index.index).ifPresent(date -> {
+                long days = ChronoUnit.DAYS.between(date, now);
+                if (days >= 30) {        // delete log older than 30 days, close index older than 7 days
+                    deleteIndex(index.index);
+                } else if (days >= 7 && index.state == IndexMetaData.State.OPEN) {
+                    closeIndex(index.index);
+                }
+            });
         }
     }
 
@@ -40,17 +51,6 @@ public class CleanupOldIndexJob implements Job {
         if (!matcher.matches()) return Optional.empty();
         String timestamp = matcher.group(1);
         return Optional.of(LocalDate.parse(timestamp));
-    }
-
-    private void process(ElasticSearchIndex index, LocalDate now) {
-        createdDate(index.index).ifPresent(date -> {
-            long days = ChronoUnit.DAYS.between(date, now);
-            if (days >= 30) {        // delete log older than 30 days, close index older than 7 days
-                deleteIndex(index.index);
-            } else if (days >= 7 && index.state == IndexMetaData.State.OPEN) {
-                closeIndex(index.index);
-            }
-        });
     }
 
     private void deleteIndex(String index) {

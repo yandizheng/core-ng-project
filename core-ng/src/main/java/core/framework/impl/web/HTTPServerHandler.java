@@ -1,18 +1,21 @@
 package core.framework.impl.web;
 
-import core.framework.api.web.Response;
-import core.framework.api.web.ResponseImpl;
 import core.framework.impl.log.ActionLog;
 import core.framework.impl.log.LogManager;
+import core.framework.impl.web.bean.RequestBeanMapper;
+import core.framework.impl.web.bean.ResponseBeanTypeValidator;
 import core.framework.impl.web.request.RequestImpl;
 import core.framework.impl.web.request.RequestParser;
 import core.framework.impl.web.response.ResponseHandler;
+import core.framework.impl.web.response.ResponseImpl;
 import core.framework.impl.web.route.Route;
 import core.framework.impl.web.session.SessionManager;
 import core.framework.impl.web.site.SiteManager;
+import core.framework.web.Response;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.HeaderMap;
+import io.undertow.util.HttpString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,38 +23,50 @@ import org.slf4j.LoggerFactory;
  * @author neo
  */
 public class HTTPServerHandler implements HttpHandler {
-    public static final String HEADER_REF_ID = "ref-id";
-    public static final String HEADER_TRACE = "trace";
-    public static final String HEADER_CLIENT = "client";
+    public static final HttpString HEADER_REF_ID = new HttpString("ref-id");
+    public static final HttpString HEADER_TRACE = new HttpString("trace");
+    public static final HttpString HEADER_CLIENT = new HttpString("client");
 
-    public final BeanValidator validator = new BeanValidator();
+    public final RequestParser requestParser = new RequestParser();
+    public final RequestBeanMapper requestBeanMapper = new RequestBeanMapper();
+    public final ResponseBeanTypeValidator responseBeanTypeValidator = new ResponseBeanTypeValidator();
     public final Route route = new Route();
     public final Interceptors interceptors = new Interceptors();
     public final WebContextImpl webContext = new WebContextImpl();
     public final HTTPServerErrorHandler errorHandler;
 
     private final Logger logger = LoggerFactory.getLogger(HTTPServerHandler.class);
-    private final RequestParser requestParser = new RequestParser();
     private final LogManager logManager;
     private final SessionManager sessionManager;
     private final ResponseHandler responseHandler;
+    private final HTTPServerHealthCheckHandler healthCheckHandler = new HTTPServerHealthCheckHandler();
 
-    public HTTPServerHandler(LogManager logManager, SiteManager siteManager) {
+    HTTPServerHandler(LogManager logManager, SiteManager siteManager) {
         this.logManager = logManager;
         sessionManager = siteManager.sessionManager;
-        responseHandler = new ResponseHandler(validator, siteManager.templateManager);
+        responseHandler = new ResponseHandler(responseBeanTypeValidator, siteManager.templateManager);
         errorHandler = new HTTPServerErrorHandler(responseHandler);
     }
 
     @Override
-    public void handleRequest(HttpServerExchange exchange) throws Exception {
+    public void handleRequest(HttpServerExchange exchange) {
         if (exchange.isInIoThread()) {
             exchange.dispatch(this);
             return;
         }
 
+        String path = exchange.getRequestPath();
+        if (HTTPServerHealthCheckHandler.PATH.equals(path)) {      // not treat health-check as action
+            healthCheckHandler.handle(exchange.getResponseSender());
+            return;
+        }
+
+        handle(path, exchange);
+    }
+
+    private void handle(String path, HttpServerExchange exchange) {
         logManager.begin("=== http transaction begin ===");
-        RequestImpl request = new RequestImpl(exchange, validator);
+        RequestImpl request = new RequestImpl(exchange, requestBeanMapper);
         try {
             webContext.initialize(request);     // initialize webContext at beginning, the customerErrorHandler in errorHandler may use it if any exception
 
@@ -66,7 +81,7 @@ public class HTTPServerHandler implements HttpHandler {
 
             actionLog.refId(headers.getFirst(HTTPServerHandler.HEADER_REF_ID));
 
-            ControllerHolder controller = route.get(request.path(), request.method(), request.pathParams, actionLog);
+            ControllerHolder controller = route.get(path, request.method(), request.pathParams, actionLog);
             actionLog.action(controller.action);
             actionLog.context("controller", controller.controllerInfo);
             logger.debug("controllerClass={}", controller.controller.getClass().getCanonicalName());
@@ -78,7 +93,7 @@ public class HTTPServerHandler implements HttpHandler {
 
             Response response = new InvocationImpl(controller, interceptors, request, webContext).proceed();
             sessionManager.save(request, response);
-            responseHandler.handle((ResponseImpl) response, exchange, request);
+            responseHandler.render((ResponseImpl) response, exchange);
         } catch (Throwable e) {
             logManager.logError(e);
             errorHandler.handleError(e, exchange, request);

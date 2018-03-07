@@ -1,13 +1,13 @@
 package core.framework.impl.validate;
 
-import core.framework.api.util.Maps;
+import core.framework.util.Maps;
 
 import java.util.Map;
 
 /**
  * @author neo
  */
-class ValidationErrors {
+public final class ValidationErrors {
     public Map<String, String> errors;
 
     public void add(String field, String error) {

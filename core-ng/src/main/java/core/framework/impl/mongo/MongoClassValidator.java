@@ -1,17 +1,18 @@
 package core.framework.impl.mongo;
 
-import core.framework.api.mongo.Collection;
-import core.framework.api.mongo.Id;
-import core.framework.api.mongo.MongoEnumValue;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.util.Sets;
+import core.framework.api.json.Property;
+import core.framework.impl.reflect.Enums;
 import core.framework.impl.reflect.Fields;
 import core.framework.impl.validate.type.DataTypeValidator;
 import core.framework.impl.validate.type.TypeVisitor;
+import core.framework.mongo.Collection;
+import core.framework.mongo.Id;
+import core.framework.mongo.MongoEnumValue;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.util.Sets;
 import org.bson.types.ObjectId;
 
-import javax.xml.bind.annotation.XmlEnumValue;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
@@ -49,14 +50,14 @@ public final class MongoClassValidator implements TypeVisitor {
 
     private boolean allowedValueClass(Class<?> valueClass) {
         return String.class.equals(valueClass)
-            || ObjectId.class.equals(valueClass)
-            || Integer.class.equals(valueClass)
-            || Boolean.class.equals(valueClass)
-            || Long.class.equals(valueClass)
-            || Double.class.equals(valueClass)
-            || LocalDateTime.class.equals(valueClass)
-            || ZonedDateTime.class.equals(valueClass)
-            || valueClass.isEnum();
+                || ObjectId.class.equals(valueClass)
+                || Integer.class.equals(valueClass)
+                || Boolean.class.equals(valueClass)
+                || Long.class.equals(valueClass)
+                || Double.class.equals(valueClass)
+                || LocalDateTime.class.equals(valueClass)
+                || ZonedDateTime.class.equals(valueClass)
+                || valueClass.isEnum();
     }
 
     @Override
@@ -70,7 +71,7 @@ public final class MongoClassValidator implements TypeVisitor {
         if (field.isAnnotationPresent(Id.class)) {
             validateId(field, parentPath == null);
         } else {
-            core.framework.api.mongo.Field mongoField = field.getDeclaredAnnotation(core.framework.api.mongo.Field.class);
+            core.framework.mongo.Field mongoField = field.getDeclaredAnnotation(core.framework.mongo.Field.class);
             if (mongoField == null)
                 throw Exceptions.error("mongo entity field must have @Field, field={}", Fields.path(field));
             String mongoFieldName = mongoField.name();
@@ -83,32 +84,26 @@ public final class MongoClassValidator implements TypeVisitor {
 
             Class<?> fieldClass = field.getType();
             if (fieldClass.isEnum()) {
-                @SuppressWarnings("unchecked")
-                Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) fieldClass;
-                validateEnumClass(enumClass, field);
+                validateEnumClass(fieldClass, field);
             }
         }
     }
 
-    private <T extends Enum<?>> void validateEnumClass(Class<T> enumClass, Field field) {
-        T[] constants = enumClass.getEnumConstants();
+    private void validateEnumClass(Class<?> enumClass, Field field) {
+        Enum<?>[] constants = (Enum<?>[]) enumClass.getEnumConstants();
         Set<String> enumValues = Sets.newHashSet();
-        for (T constant : constants) {
-            try {
-                Field enumField = enumClass.getDeclaredField(constant.name());
-                MongoEnumValue enumValue = enumField.getDeclaredAnnotation(MongoEnumValue.class);
-                if (enumValue == null) {
-                    throw Exceptions.error("mongo enum must have @MongoEnumValue, field={}, enum={}", Fields.path(field), Fields.path(enumField));
-                }
-                boolean added = enumValues.add(enumValue.value());
-                if (!added) {
-                    throw Exceptions.error("mongo enum value must be unique, enum={}, value={}", enumClass.getCanonicalName() + "." + constant, enumValue.value());
-                }
-                if (enumField.isAnnotationPresent(XmlEnumValue.class)) {
-                    throw Exceptions.error("mongo enum must not have jaxb annotation, please separate view and entity, field={}, enum={}", Fields.path(field), Fields.path(enumField));
-                }
-            } catch (NoSuchFieldException e) {
-                throw new Error(e);
+        for (Enum<?> constant : constants) {
+            MongoEnumValue enumValue = Enums.constantAnnotation(constant, MongoEnumValue.class);
+            if (enumValue == null) {
+                throw Exceptions.error("mongo enum must have @MongoEnumValue, field={}, enum={}", Fields.path(field), Enums.path(constant));
+            }
+            boolean added = enumValues.add(enumValue.value());
+            if (!added) {
+                throw Exceptions.error("mongo enum value must be unique, enum={}, value={}", Enums.path(constant), enumValue.value());
+            }
+            Property property = Enums.constantAnnotation(constant, Property.class);
+            if (property != null) {
+                throw Exceptions.error("mongo enum must not have json annotation, please separate view and entity, field={}, enum={}", Fields.path(field), Enums.path(constant));
             }
         }
     }

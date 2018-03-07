@@ -1,9 +1,9 @@
 package core.framework.impl.web.request;
 
-import core.framework.api.util.Encodings;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.web.exception.BadRequestException;
+import core.framework.util.Encodings;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.web.exception.BadRequestException;
 
 import java.util.Map;
 
@@ -11,7 +11,7 @@ import java.util.Map;
  * @author neo
  */
 public final class PathParams {
-    final Map<String, String> params = Maps.newHashMap();
+    private final Map<String, String> params = Maps.newHashMap();
 
     public void put(String name, String value) {
         if (value.length() == 0) throw new BadRequestException("path param must not be empty, name=" + name + ", value=" + value);

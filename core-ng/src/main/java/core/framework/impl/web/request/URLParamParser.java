@@ -1,9 +1,9 @@
 package core.framework.impl.web.request;
 
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.JSON;
-import core.framework.api.util.Strings;
-import core.framework.api.web.exception.BadRequestException;
+import core.framework.json.JSON;
+import core.framework.util.Exceptions;
+import core.framework.util.Strings;
+import core.framework.web.exception.BadRequestException;
 
 /**
  * @author neo
@@ -25,7 +25,7 @@ public class URLParamParser {    // parse query param and path param
         throw Exceptions.error("not supported path param type, please contact arch team, type={}", valueClass.getCanonicalName());
     }
 
-    private static <T extends Enum<?>> T toEnum(String value, Class<T> valueClass) {
+    public static <T extends Enum<?>> T toEnum(String value, Class<T> valueClass) {
         try {
             return JSON.fromEnumValue(valueClass, value);
         } catch (IllegalArgumentException e) {
@@ -33,7 +33,7 @@ public class URLParamParser {    // parse query param and path param
         }
     }
 
-    private static Long toLong(String value) {
+    public static Long toLong(String value) {
         try {
             return Long.parseLong(value);
         } catch (NumberFormatException e) {
@@ -41,7 +41,7 @@ public class URLParamParser {    // parse query param and path param
         }
     }
 
-    private static Integer toInt(String value) {
+    public static Integer toInt(String value) {
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException e) {
@@ -49,7 +49,7 @@ public class URLParamParser {    // parse query param and path param
         }
     }
 
-    private static Boolean toBoolean(String value) {
+    public static Boolean toBoolean(String value) {
         try {
             return Boolean.valueOf(value);
         } catch (NumberFormatException e) {

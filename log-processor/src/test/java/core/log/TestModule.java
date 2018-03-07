@@ -1,6 +1,6 @@
 package core.log;
 
-import core.framework.api.AbstractTestModule;
+import core.framework.test.module.AbstractTestModule;
 import core.log.service.IndexService;
 import core.log.service.KafkaConsumerFactory;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -22,7 +22,7 @@ public class TestModule extends AbstractTestModule {
 
     private static class MockKafkaConsumerFactory extends KafkaConsumerFactory {
         MockKafkaConsumerFactory() {
-            super("localhost:9092");
+            super(null);
         }
 
         @Override

@@ -1,6 +1,6 @@
 package core.framework.impl.template.parser;
 
-import core.framework.api.util.Exceptions;
+import core.framework.util.Exceptions;
 
 /**
  * @author neo
@@ -169,7 +169,11 @@ class HTMLLexer {
     }
 
     private int findAttributeValueLength() {
-        boolean hasDoubleQuote = currentIndex < html.length() && html.charAt(currentIndex) == '"';
+        char currentChar = html.charAt(currentIndex);
+        if (currentChar == '\'')
+            throw Exceptions.error("it is recommended to use double quote to delimit attribute value, location={}", currentLocation());
+
+        boolean hasDoubleQuote = currentIndex < html.length() && currentChar == '"';
         int i = hasDoubleQuote ? currentIndex + 1 : currentIndex;
         for (; i < html.length(); i++) {
             char ch = html.charAt(i);

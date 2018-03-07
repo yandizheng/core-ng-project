@@ -1,8 +1,10 @@
 package core.framework.impl.kafka;
 
-import core.framework.api.util.Maps;
-import core.framework.api.util.StopWatch;
 import core.framework.impl.log.LogManager;
+import core.framework.util.Maps;
+import core.framework.util.StopWatch;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -30,7 +32,6 @@ public class Kafka {
     private final String name;
     private final LogManager logManager;
     public String uri;
-    public MessageValidator validator = new MessageValidator();
     public Duration maxProcessTime = Duration.ofMinutes(30);
     public int maxPollRecords = 500;    // default kafka setting, refer to org.apache.kafka.clients.consumer.ConsumerConfig.MAX_POLL_RECORDS_CONFIG
     public int maxPollBytes = 3 * 1024 * 1024;  // get 3M bytes message at max
@@ -61,7 +62,7 @@ public class Kafka {
             config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, uri);
             config.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, Duration.ofSeconds(30).toMillis());  // metadata update timeout
             Producer<String, byte[]> producer = new KafkaProducer<>(config, new StringSerializer(), new ByteArraySerializer());
-            producerMetrics.setMetrics(producer.metrics());
+            producerMetrics.set(producer.metrics());
             return producer;
         } finally {
             logger.info("create kafka producer, uri={}, name={}, elapsedTime={}", uri, name, watch.elapsedTime());
@@ -85,11 +86,19 @@ public class Kafka {
             config.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG, (int) minPollMaxWaitTime.toMillis());
             Consumer<String, byte[]> consumer = new KafkaConsumer<>(config, new StringDeserializer(), new ByteArrayDeserializer());
             consumer.subscribe(topics);
-            consumerMetrics.addMetrics(consumer.metrics());
+            consumerMetrics.add(consumer.metrics());
             return consumer;
         } finally {
             logger.info("create kafka consumer, uri={}, name={}, topics={}, elapsedTime={}", uri, name, topics, watch.elapsedTime());
         }
+    }
+
+    public AdminClient admin() {
+        if (uri == null) throw new Error("uri must not be null");
+
+        Map<String, Object> config = Maps.newHashMap();
+        config.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, uri);
+        return AdminClient.create(config);
     }
 
     public KafkaMessageListener listener() {

@@ -4,6 +4,22 @@ package core.framework.impl.log;
  * @author neo
  */
 final class PerformanceStat {
-    public long totalElapsed;
-    public int count = 0;
+    long totalElapsed;
+    int count;
+    Integer readEntries;
+    Integer writeEntries;
+
+    public void increaseReadEntries(Integer entries) {
+        if (entries != null) {
+            if (readEntries == null) readEntries = entries;
+            else readEntries += entries;
+        }
+    }
+
+    public void increaseWriteEntries(Integer entries) {
+        if (entries != null) {
+            if (writeEntries == null) writeEntries = entries;
+            else writeEntries += entries;
+        }
+    }
 }

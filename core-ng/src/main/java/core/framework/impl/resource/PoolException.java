@@ -1,6 +1,6 @@
 package core.framework.impl.resource;
 
-import core.framework.api.log.ErrorCode;
+import core.framework.log.ErrorCode;
 
 /**
  * @author neo
@@ -10,7 +10,7 @@ public final class PoolException extends RuntimeException implements ErrorCode {
 
     private final String errorCode;
 
-    public PoolException(String message, String errorCode) {
+    PoolException(String message, String errorCode) {
         super(message);
         this.errorCode = errorCode;
     }

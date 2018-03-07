@@ -1,10 +1,10 @@
 package core.framework.impl.db;
 
-import core.framework.api.db.DBEnumValue;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
+import core.framework.db.DBEnumValue;
+import core.framework.impl.reflect.Enums;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
 
-import java.lang.reflect.Field;
 import java.util.Map;
 
 /**
@@ -19,6 +19,7 @@ final class DBEnumMapper<T extends Enum<T>> {
         mappings = mappings(enumClass);
     }
 
+    // used by generated code, must be public
     public T getEnum(String value) {
         if (value == null) return null;
         T enumValue = mappings.get(value);
@@ -31,13 +32,8 @@ final class DBEnumMapper<T extends Enum<T>> {
         T[] constants = enumClass.getEnumConstants();
         Map<String, T> mapping = Maps.newHashMapWithExpectedSize(constants.length);
         for (T constant : constants) {
-            try {
-                Field field = enumClass.getField(constant.name());
-                String dbValue = field.getDeclaredAnnotation(DBEnumValue.class).value();
-                mapping.put(dbValue, constant);
-            } catch (NoSuchFieldException e) {
-                throw new Error(e);
-            }
+            String dbValue = Enums.constantAnnotation(constant, DBEnumValue.class).value();
+            mapping.put(dbValue, constant);
         }
         return mapping;
     }

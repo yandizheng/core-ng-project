@@ -1,14 +1,15 @@
 package core.framework.impl.web.service;
 
-import core.framework.impl.web.BeanValidator;
-import org.junit.Test;
+import core.framework.impl.web.bean.RequestBeanMapper;
+import core.framework.impl.web.bean.ResponseBeanTypeValidator;
+import org.junit.jupiter.api.Test;
 
 /**
  * @author neo
  */
-public class WebServiceInterfaceValidatorTest {
+class WebServiceInterfaceValidatorTest {
     @Test
-    public void validate() {
-        new WebServiceInterfaceValidator(TestWebService.class, new BeanValidator()).validate();
+    void validate() {
+        new WebServiceInterfaceValidator(TestWebService.class, new RequestBeanMapper(), new ResponseBeanTypeValidator()).validate();
     }
 }

@@ -1,17 +1,16 @@
 apply from: file("${rootDir}/gradle/project.gradle")
 
 subprojects {
-    apply from: file("${rootDir}/gradle/check.gradle")
-
     group = 'core.framework'
-    version = '4.12.4'
+    version = '6.0.0'
 }
 
-def mongoVersion = '3.4.2'
-def elasticVersion = '5.4.0'
-def rabbitVersion = '3.6.5'
-def kafkaVersion = '0.10.2.0'
-def jacksonVersion = '2.8.7'
+def mongoVersion = '3.5.0'
+def elasticVersion = '6.2.2'
+def log4jVersion = '2.9.1'  // used by elasticsearch
+def kafkaVersion = '1.0.0'
+def jacksonVersion = '2.9.4'
+def junitVersion = '5.1.0'
 
 project(':core-ng-api') {
     apply from: file("${rootDir}/gradle/lib.gradle")
@@ -20,77 +19,60 @@ project(':core-ng-api') {
 project(':core-ng') {
     apply from: file("${rootDir}/gradle/lib.gradle")
     dependencies {
-        api(
-                project(":core-ng-api"),
-                'javax.inject:javax.inject:1',
-                'org.slf4j:slf4j-api:1.7.21'
-        )
-        implementation(
-                'org.javassist:javassist:3.21.0-GA',
-                "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}",
-                "com.fasterxml.jackson.module:jackson-module-jaxb-annotations:${jacksonVersion}",
-                "com.fasterxml.jackson.module:jackson-module-afterburner:${jacksonVersion}",
-                "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}",
-                "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:${jacksonVersion}",
-                'org.apache.httpcomponents:httpclient:4.5.3',
-                'io.undertow:undertow-core:1.4.15.Final'
-        )
-        compileOnly(
-                'redis.clients:jedis:2.9.0@jar',
-                "org.mongodb:mongo-java-driver:${mongoVersion}",
-                "com.rabbitmq:amqp-client:${rabbitVersion}",
-                "org.apache.kafka:kafka-clients:${kafkaVersion}@jar",
-                "org.elasticsearch.client:transport:${elasticVersion}",
-                'org.apache.logging.log4j:log4j-api:2.7'   // used by elasticsearch
-        )
-        testImplementation(
-                'junit:junit:4.12',
-                'org.mockito:mockito-core:2.7.22'
-        )
-        testRuntimeOnly(
-                'org.hsqldb:hsqldb:2.3.3'
-        )
+        api project(":core-ng-api")
+        api 'org.slf4j:slf4j-api:1.7.25'
+        implementation 'org.javassist:javassist:3.22.0-GA'
+        implementation "com.fasterxml.jackson.module:jackson-module-afterburner:${jacksonVersion}"
+        implementation "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${jacksonVersion}"
+        implementation "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:${jacksonVersion}"
+        implementation 'org.apache.httpcomponents:httpclient:4.5.5'
+        implementation 'io.undertow:undertow-core:2.0.1.Final'
+        compileOnly "org.mongodb:mongo-java-driver:${mongoVersion}"
+        compileOnly "org.apache.kafka:kafka-clients:${kafkaVersion}@jar"
+        compileOnly "org.elasticsearch.client:transport:${elasticVersion}"
+        compileOnly "org.apache.logging.log4j:log4j-api:${log4jVersion}"        // used by elasticsearch
+        testImplementation "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+        testImplementation 'org.mockito:mockito-core:2.15.0'
+        testImplementation 'org.assertj:assertj-core:3.9.0'
+        testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+        testRuntimeOnly 'org.hsqldb:hsqldb:2.4.0'
     }
 }
 
 project(':core-ng-test') {
     apply from: file("${rootDir}/gradle/lib.gradle")
-
     dependencies {
-        api(
-                project(":core-ng"),
-                'junit:junit:4.12',
-                'org.mockito:mockito-core:2.7.13'
-        )
-        compileOnly(
-                "org.mongodb:mongo-java-driver:${mongoVersion}",
-                "com.github.fakemongo:fongo:2.0.12@jar",
-                "com.rabbitmq:amqp-client:${rabbitVersion}",
-                "org.apache.kafka:kafka-clients:${kafkaVersion}@jar",
-                "org.elasticsearch.client:transport:${elasticVersion}",
-                'org.apache.logging.log4j:log4j-core:2.7'       // used by elasticsearch
-        )
-        testRuntimeOnly(
-                'org.hsqldb:hsqldb:2.3.3',
-                'com.vividsolutions:jts:1.13'                  // used by fongo
-        )
+        api project(":core-ng")
+        api "org.junit.jupiter:junit-jupiter-api:${junitVersion}"
+        api 'org.mockito:mockito-core:2.15.0'
+        api 'org.assertj:assertj-core:3.9.0'
+        implementation "org.junit.jupiter:junit-jupiter-engine:${junitVersion}"
+        compileOnly "org.mongodb:mongo-java-driver:${mongoVersion}"
+        compileOnly "com.github.fakemongo:fongo:2.1.0@jar"
+        compileOnly "org.apache.kafka:kafka-clients:${kafkaVersion}@jar"
+        compileOnly "org.elasticsearch.client:transport:${elasticVersion}"
+        compileOnly "org.apache.logging.log4j:log4j-core:${log4jVersion}"       // used by elasticsearch
+        testRuntimeOnly 'org.hsqldb:hsqldb:2.4.0'
+        testRuntimeOnly 'com.vividsolutions:jts:1.13'                           // used by fongo
+        testRuntimeOnly "org.codelibs.elasticsearch.module:lang-painless:${elasticVersion}"
     }
 }
 
+def mavenURL = hasProperty('mavenURL') ? mavenURL : null    // usage: "gradlew -PmavenURL=/path clean publish"
+
 configure(subprojects.findAll { it.name.startsWith('core-ng') }) {
     apply plugin: 'maven-publish'
-    publishing {
-        publications {
-            mavenJava(MavenPublication) {
-                from components.java
-                artifact sourcesJar {
-                    classifier 'sources'
+    if (mavenURL != null) {
+        assert project.file(mavenURL).exists()
+        publishing {
+            publications {
+                mavenJava(MavenPublication) {
+                    from components.java
+                    artifact sourcesJar { classifier 'sources' }
                 }
             }
-        }
-        repositories {
-            maven {
-                url System.properties['maven.repo']     // set in gradle.properties, e.g. systemProp.maven.repo=/path
+            repositories {
+                maven { url mavenURL }
             }
         }
     }
@@ -99,17 +81,12 @@ configure(subprojects.findAll { it.name.startsWith('core-ng') }) {
 project(':log-processor') {
     apply from: file("${rootDir}/gradle/app.gradle")
     dependencies {
-        compile(
-                project(':core-ng'),
-                "org.elasticsearch.client:transport:${elasticVersion}",
-                "org.apache.kafka:kafka-clients:${kafkaVersion}"
-        )
-        runtime(
-                'org.apache.logging.log4j:log4j-api:2.7'       // used by elasticsearch
-        )
-        testCompile(
-                project(':core-ng-test'),
-                'org.apache.logging.log4j:log4j-core:2.7'       // used by elasticsearch
-        )
+        compile project(':core-ng')
+        compile "org.elasticsearch.client:transport:${elasticVersion}"
+        compile "org.apache.kafka:kafka-clients:${kafkaVersion}"
+        runtime "org.apache.logging.log4j:log4j-api:${log4jVersion}"            // used by elasticsearch
+        testCompile project(':core-ng-test')
+        testRuntime "org.apache.logging.log4j:log4j-core:${log4jVersion}"       // used by elasticsearch
+        testRuntime "org.codelibs.elasticsearch.module:mapper-extras:${elasticVersion}"     // used by elasticsearch scaled_float
     }
 }

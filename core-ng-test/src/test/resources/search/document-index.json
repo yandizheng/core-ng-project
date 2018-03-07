@@ -3,13 +3,13 @@
   },
   "mappings": {
     "document": {
-      "_all": {
-        "enabled": false
-      },
       "properties": {
         "string_field": {
           "type": "text",
           "analyzer": "standard"
+        },
+        "num_field": {
+          "type": "integer"
         },
         "zoned_date_time_field": {
           "type": "date"

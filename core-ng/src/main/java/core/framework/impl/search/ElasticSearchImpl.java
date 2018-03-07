@@ -1,12 +1,12 @@
 package core.framework.impl.search;
 
 import com.carrotsearch.hppc.cursors.ObjectObjectCursor;
-import core.framework.api.search.ElasticSearch;
-import core.framework.api.search.ElasticSearchIndex;
-import core.framework.api.search.ElasticSearchType;
-import core.framework.api.search.SearchException;
-import core.framework.api.util.Lists;
-import core.framework.api.util.StopWatch;
+import core.framework.search.ElasticSearch;
+import core.framework.search.ElasticSearchIndex;
+import core.framework.search.ElasticSearchType;
+import core.framework.search.SearchException;
+import core.framework.util.Lists;
+import core.framework.util.StopWatch;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateRequest;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateResponse;
@@ -18,7 +18,6 @@ import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.network.NetworkService;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
@@ -37,25 +36,13 @@ import java.util.List;
 public class ElasticSearchImpl implements ElasticSearch {
     private final Logger logger = LoggerFactory.getLogger(ElasticSearchImpl.class);
     private final List<TransportAddress> addresses = Lists.newArrayList();
+    public Duration slowOperationThreshold = Duration.ofSeconds(5);
+    public Duration timeout = Duration.ofSeconds(10);
+    public boolean sniff;      // if enabled, es client will use all nodes in cluster and only use "publish address" to connect
     private Client client;
-    private Duration timeout = Duration.ofSeconds(10);
-    private Duration slowOperationThreshold = Duration.ofSeconds(5);
-    private boolean sniff;      // if enabled, es client will use all nodes in cluster and only use "publish address" to connect
 
     public void host(String host) {
-        addresses.add(new InetSocketTransportAddress(new InetSocketAddress(host, 9300)));
-    }
-
-    public void slowOperationThreshold(Duration slowOperationThreshold) {
-        this.slowOperationThreshold = slowOperationThreshold;
-    }
-
-    public void timeout(Duration timeout) {
-        this.timeout = timeout;
-    }
-
-    public void sniff(boolean sniff) {
-        this.sniff = sniff;
+        addresses.add(new TransportAddress(new InetSocketAddress(host, 9300)));
     }
 
     public void initialize() {
@@ -171,7 +158,8 @@ public class ElasticSearchImpl implements ElasticSearch {
         StopWatch watch = new StopWatch();
         try {
             Settings.Builder settings = Settings.builder();
-            settings.put(NetworkService.TcpSettings.TCP_CONNECT_TIMEOUT.getKey(), new TimeValue(timeout.toMillis()))
+            settings.put(NetworkService.TCP_CONNECT_TIMEOUT.getKey(), new TimeValue(timeout.toMillis()))
+                    .put(TransportClient.CLIENT_TRANSPORT_PING_TIMEOUT.getKey(), new TimeValue(timeout.toMillis()))
                     .put(TransportClient.CLIENT_TRANSPORT_PING_TIMEOUT.getKey(), new TimeValue(timeout.toMillis()))
                     .put(TransportClient.CLIENT_TRANSPORT_IGNORE_CLUSTER_NAME.getKey(), "true");     // refer to https://www.elastic.co/guide/en/elasticsearch/client/java-api/current/transport-client.html
             if (sniff) {

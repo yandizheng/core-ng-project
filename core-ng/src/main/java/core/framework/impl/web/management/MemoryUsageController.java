@@ -1,8 +1,8 @@
 package core.framework.impl.web.management;
 
-import core.framework.api.web.Controller;
-import core.framework.api.web.Request;
-import core.framework.api.web.Response;
+import core.framework.web.Controller;
+import core.framework.web.Request;
+import core.framework.web.Response;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
@@ -12,8 +12,8 @@ import java.lang.management.MemoryMXBean;
  */
 public class MemoryUsageController implements Controller {
     @Override
-    public Response execute(Request request) throws Exception {
-        ControllerHelper.validateFromLocalNetwork(request.clientIP());
+    public Response execute(Request request) {
+        ControllerHelper.assertFromLocalNetwork(request.clientIP());
         return Response.bean(memoryUsage());
     }
 

@@ -1,9 +1,9 @@
 package core.framework.impl.log;
 
-import core.framework.api.log.MessageFilter;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Strings;
 import core.framework.impl.log.marker.ErrorCodeMarker;
+import core.framework.log.MessageFilter;
+import core.framework.util.Exceptions;
+import core.framework.util.Strings;
 import org.slf4j.Marker;
 
 import java.time.Instant;
@@ -50,9 +50,8 @@ final class LogEvent {
                 builder.append('[').append(marker.getName()).append("] ");
             }
 
-            builder.append(message());
-
-            builder.append(System.lineSeparator());
+            builder.append(message())
+                   .append(System.lineSeparator());
             if (exception != null)
                 builder.append(Exceptions.stackTrace(exception));
 

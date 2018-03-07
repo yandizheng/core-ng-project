@@ -1,16 +1,21 @@
 package core.framework.impl.web.service;
 
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Sets;
-import core.framework.api.util.Strings;
 import core.framework.api.web.service.DELETE;
 import core.framework.api.web.service.GET;
+import core.framework.api.web.service.PATCH;
 import core.framework.api.web.service.POST;
 import core.framework.api.web.service.PUT;
 import core.framework.api.web.service.Path;
 import core.framework.api.web.service.PathParam;
-import core.framework.impl.validate.type.JAXBTypeValidator;
-import core.framework.impl.web.BeanValidator;
+import core.framework.http.HTTPMethod;
+import core.framework.impl.reflect.Params;
+import core.framework.impl.validate.type.JSONTypeValidator;
+import core.framework.impl.web.bean.RequestBeanMapper;
+import core.framework.impl.web.bean.ResponseBeanTypeValidator;
+import core.framework.impl.web.route.PathPatternValidator;
+import core.framework.util.Exceptions;
+import core.framework.util.Sets;
+import core.framework.util.Strings;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -22,11 +27,13 @@ import java.util.Set;
  */
 public class WebServiceInterfaceValidator {
     private final Class<?> serviceInterface;
-    private final BeanValidator validator;
+    private final RequestBeanMapper requestBeanMapper;
+    private final ResponseBeanTypeValidator responseBeanTypeValidator;
 
-    public WebServiceInterfaceValidator(Class<?> serviceInterface, BeanValidator validator) {
+    public WebServiceInterfaceValidator(Class<?> serviceInterface, RequestBeanMapper requestBeanMapper, ResponseBeanTypeValidator responseBeanTypeValidator) {
         this.serviceInterface = serviceInterface;
-        this.validator = validator;
+        this.requestBeanMapper = requestBeanMapper;
+        this.responseBeanTypeValidator = responseBeanTypeValidator;
     }
 
     public void validate() {
@@ -40,11 +47,14 @@ public class WebServiceInterfaceValidator {
 
     private void validate(Method method) {
         validateHTTPMethod(method);
-        Path path = method.getDeclaredAnnotation(Path.class);
-        if (path == null)
-            throw Exceptions.error("method must have @Path, method={}", method);
 
-        validateReturnType(method.getGenericReturnType());
+        HTTPMethod httpMethod = HTTPMethods.httpMethod(method);
+
+        Path path = method.getDeclaredAnnotation(Path.class);
+        if (path == null) throw Exceptions.error("method must have @Path, method={}", method);
+        new PathPatternValidator(path.value()).validate();
+
+        validateResponseBeanType(method.getGenericReturnType());
 
         Set<String> pathVariables = pathVariables(path.value());
         Type requestBeanType = null;
@@ -55,16 +65,20 @@ public class WebServiceInterfaceValidator {
 
         for (int i = 0; i < paramTypes.length; i++) {
             Type paramType = paramTypes[i];
-            PathParam pathParam = pathParam(annotations[i]);
+            PathParam pathParam = Params.annotation(annotations[i], PathParam.class);
             if (pathParam != null) {
                 validatePathParamType(paramType);
                 pathParams.add(pathParam.value());
             } else {
                 if (requestBeanType != null)
                     throw Exceptions.error("service method must not have more than one bean param, previous={}, current={}", requestBeanType.getTypeName(), paramType.getTypeName());
-
                 requestBeanType = paramType;
-                validator.register(paramType);
+
+                if (httpMethod == HTTPMethod.GET || httpMethod == HTTPMethod.DELETE) {
+                    requestBeanMapper.registerQueryParamBean(requestBeanType);
+                } else {
+                    requestBeanMapper.registerRequestBean(requestBeanType);
+                }
             }
         }
 
@@ -76,7 +90,7 @@ public class WebServiceInterfaceValidator {
         Set<String> names = Sets.newHashSet();
         String[] tokens = Strings.split(path, '/');
         for (String token : tokens) {
-            if (token.startsWith(":")) {
+            if (Strings.startsWith(token, ':')) {
                 int paramIndex = token.indexOf('(');
                 int endIndex = paramIndex > 0 ? paramIndex : token.length();
                 boolean isNew = names.add(token.substring(1, endIndex));
@@ -84,13 +98,6 @@ public class WebServiceInterfaceValidator {
             }
         }
         return names;
-    }
-
-    private PathParam pathParam(Annotation[] paramAnnotations) {
-        for (Annotation paramAnnotation : paramAnnotations) {
-            if (paramAnnotation instanceof PathParam) return (PathParam) paramAnnotation;
-        }
-        return null;
     }
 
     private void validatePathParamType(Type paramType) {
@@ -106,24 +113,25 @@ public class WebServiceInterfaceValidator {
         if (Long.class.equals(paramClass)) return;
         if (String.class.equals(paramClass)) return;
         if (paramClass.isEnum()) {
-            @SuppressWarnings("unchecked")
-            Class<? extends Enum<?>> enumClass = (Class<? extends Enum<?>>) paramClass;
-            JAXBTypeValidator.validateEnumClass(enumClass);
+            JSONTypeValidator.validateEnumClass(paramClass);
             return;
         }
         throw Exceptions.error("path param class is not supported, paramClass={}", paramClass);
     }
 
-    private void validateReturnType(Type returnType) {
-        if (void.class == returnType) return;
-        validator.register(returnType);
+    private void validateResponseBeanType(Type responseBeanType) {
+        if (void.class == responseBeanType) return;
+        responseBeanTypeValidator.validate(responseBeanType);
     }
 
     private void validateHTTPMethod(Method method) {
-        if (method.isAnnotationPresent(GET.class)) return;
-        if (method.isAnnotationPresent(POST.class)) return;
-        if (method.isAnnotationPresent(PUT.class)) return;
-        if (method.isAnnotationPresent(DELETE.class)) return;
-        throw Exceptions.error("method must have http method annotation, method={}", method);
+        int count = 0;
+        if (method.isAnnotationPresent(GET.class)) count++;
+        if (method.isAnnotationPresent(POST.class)) count++;
+        if (method.isAnnotationPresent(PUT.class)) count++;
+        if (method.isAnnotationPresent(DELETE.class)) count++;
+        if (method.isAnnotationPresent(PATCH.class)) count++;
+        if (count != 1)
+            throw Exceptions.error("method must have exact one http method annotation, method={}", method);
     }
 }

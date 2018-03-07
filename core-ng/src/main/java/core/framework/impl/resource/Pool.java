@@ -1,6 +1,6 @@
 package core.framework.impl.resource;
 
-import core.framework.api.util.StopWatch;
+import core.framework.util.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,24 +23,19 @@ import java.util.function.Supplier;
  *
  * @author neo
  */
-public final class Pool<T> {
+public class Pool<T extends AutoCloseable> {
     final BlockingDeque<PoolItem<T>> idleItems = new LinkedBlockingDeque<>();
+    final String name;
     private final Logger logger = LoggerFactory.getLogger(Pool.class);
-    private final AtomicInteger total = new AtomicInteger(0);
+    private final AtomicInteger size = new AtomicInteger(0);
     private final Supplier<T> factory;
-    private final ResourceCloseHandler<T> closeHandler;
-    private String name;
+    public Duration maxIdleTime = Duration.ofMinutes(30);
     private int minSize = 1;
     private int maxSize = 50;
-    private Duration maxIdleTime = Duration.ofMinutes(30);
     private long checkoutTimeoutInMs = Duration.ofSeconds(30).toMillis();
 
-    public Pool(Supplier<T> factory, ResourceCloseHandler<T> closeHandler) {
+    public Pool(Supplier<T> factory, String name) {
         this.factory = factory;
-        this.closeHandler = closeHandler;
-    }
-
-    public void name(String name) {
         this.name = name;
     }
 
@@ -49,19 +44,15 @@ public final class Pool<T> {
         this.maxSize = maxSize;
     }
 
-    public void maxIdleTime(Duration maxIdleTime) {
-        this.maxIdleTime = maxIdleTime;
-    }
-
-    public void checkoutTimeout(Duration checkoutTimeout) {
-        checkoutTimeoutInMs = checkoutTimeout.toMillis();
+    public void checkoutTimeout(Duration timeout) {
+        checkoutTimeoutInMs = timeout.toMillis();
     }
 
     public PoolItem<T> borrowItem() {
         PoolItem<T> item = idleItems.poll();
         if (item != null) return item;
 
-        if (total.get() < maxSize) {
+        if (size.get() < maxSize) {
             return createNewItem();
         } else {
             return waitNextAvailableItem();
@@ -79,11 +70,11 @@ public final class Pool<T> {
 
     private void recycleItem(PoolItem<T> item) {
         StopWatch watch = new StopWatch();
-        int total = this.total.decrementAndGet();
+        int size = this.size.decrementAndGet();
         try {
             closeResource(item.resource);
         } finally {
-            logger.debug("recycle resource, pool={}, total={}, elapsed={}", name, total, watch.elapsedTime());
+            logger.debug("recycle resource, pool={}, size={}, elapsed={}", name, size, watch.elapsedTime());
         }
     }
 
@@ -96,20 +87,20 @@ public final class Pool<T> {
         } catch (InterruptedException e) {
             throw new Error("interrupted during waiting for next available resource", e);
         } finally {
-            logger.debug("wait for next available resource, pool={}, total={}, elapsed={}", name, total.get(), watch.elapsedTime());
+            logger.debug("wait for next available resource, pool={}, size={}, elapsed={}", name, size.get(), watch.elapsedTime());
         }
     }
 
     private PoolItem<T> createNewItem() {
         StopWatch watch = new StopWatch();
-        total.incrementAndGet();
+        size.incrementAndGet();
         try {
             return new PoolItem<>(factory.get());
         } catch (Throwable e) {
-            total.getAndDecrement();
+            size.getAndDecrement();
             throw e;
         } finally {
-            logger.debug("create new resource, pool={}, total={}, elapsed={}", name, total.get(), watch.elapsedTime());
+            logger.debug("create new resource, pool={}, size={}, elapsed={}", name, size.get(), watch.elapsedTime());
         }
     }
 
@@ -119,6 +110,14 @@ public final class Pool<T> {
         replenish();
     }
 
+    int activeCount() {
+        return totalCount() - idleItems.size();
+    }
+
+    int totalCount() {
+        return size.get();
+    }
+
     private void recycleIdleItems() {
         Iterator<PoolItem<T>> iterator = idleItems.descendingIterator();
         long maxIdleTimeInSeconds = maxIdleTime.getSeconds();
@@ -126,7 +125,7 @@ public final class Pool<T> {
 
         while (iterator.hasNext()) {
             PoolItem<T> item = iterator.next();
-            if (Duration.between(Instant.ofEpochMilli(item.returnTime), now).getSeconds() > maxIdleTimeInSeconds) {
+            if (Duration.between(Instant.ofEpochMilli(item.returnTime), now).getSeconds() >= maxIdleTimeInSeconds) {
                 boolean removed = idleItems.remove(item);
                 if (!removed) return;
                 recycleItem(item);
@@ -137,21 +136,21 @@ public final class Pool<T> {
     }
 
     private void replenish() {
-        while (total.get() < minSize) {
+        while (size.get() < minSize) {
             returnItem(createNewItem());
         }
     }
 
     private void closeResource(T resource) {
         try {
-            closeHandler.close(resource);
+            resource.close();
         } catch (Exception e) {
             logger.warn("failed to close resource, pool={}", name, e);
         }
     }
 
     public void close() {
-        total.set(maxSize);   // make sure no more new resource will be created
+        size.set(maxSize);   // make sure no more new resource will be created
         while (true) {
             PoolItem<T> item = idleItems.poll();
             if (item == null) return;

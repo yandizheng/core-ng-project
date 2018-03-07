@@ -1,7 +1,7 @@
 package core.framework.impl.web;
 
-import core.framework.api.util.Charsets;
 import core.framework.impl.web.request.RequestBodyReader;
+import core.framework.util.Charsets;
 import io.undertow.server.HttpHandler;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.form.FormDataParser;
@@ -51,6 +51,6 @@ class HTTPServerIOHandler implements HttpHandler {
         if (length == 0) return false;  // if body is empty, skip reading
 
         HttpString method = exchange.getRequestMethod();
-        return Methods.POST.equals(method) || Methods.PUT.equals(method);
+        return Methods.POST.equals(method) || Methods.PUT.equals(method) || Methods.PATCH.equals(method);
     }
 }

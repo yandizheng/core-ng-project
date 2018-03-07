@@ -1,6 +1,6 @@
 package core.framework.impl.cache;
 
-import core.framework.api.util.Maps;
+import core.framework.util.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,8 +11,8 @@ import java.util.Map;
  * @author neo
  */
 public class LocalCacheStore implements CacheStore {
+    final Map<String, CacheItem> caches = Maps.newConcurrentHashMap();
     private final Logger logger = LoggerFactory.getLogger(LocalCacheStore.class);
-    private final Map<String, CacheItem> caches = Maps.newConcurrentHashMap();
 
     @Override
     public byte[] get(String key) {
@@ -26,7 +26,7 @@ public class LocalCacheStore implements CacheStore {
     }
 
     @Override
-    public Map<String, byte[]> getAll(String[] keys) {
+    public Map<String, byte[]> getAll(String... keys) {
         Map<String, byte[]> results = Maps.newHashMapWithExpectedSize(keys.length);
         for (String key : keys) {
             byte[] value = get(key);
@@ -59,16 +59,16 @@ public class LocalCacheStore implements CacheStore {
         });
     }
 
-    public static class CacheItem {
+    static class CacheItem {
         final byte[] value;
         final long expirationTime;
 
-        public CacheItem(byte[] value, long expirationTime) {
+        CacheItem(byte[] value, long expirationTime) {
             this.value = value;
             this.expirationTime = expirationTime;
         }
 
-        public boolean expired(long now) {
+        boolean expired(long now) {
             return now >= expirationTime;
         }
     }

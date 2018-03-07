@@ -1,8 +1,8 @@
 package core.framework.impl.web.session;
 
-import core.framework.api.redis.Redis;
-import core.framework.api.util.Lists;
-import core.framework.api.util.Maps;
+import core.framework.redis.Redis;
+import core.framework.util.Lists;
+import core.framework.util.Maps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +48,7 @@ public class RedisSessionStore implements SessionStore {
             if (value == null) deletedFields.add(changedSessionField);
             else updatedValues.put(changedSessionField, value);
         }
-        if (!deletedFields.isEmpty()) redis.hash().del(key, deletedFields.toArray(new String[deletedFields.size()]));
+        if (!deletedFields.isEmpty()) redis.hash().del(key, deletedFields.toArray(new String[0]));
         if (!updatedValues.isEmpty()) redis.hash().multiSet(key, updatedValues);
         redis.expire(key, sessionTimeout);
     }

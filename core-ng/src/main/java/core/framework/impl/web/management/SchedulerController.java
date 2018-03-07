@@ -1,14 +1,12 @@
 package core.framework.impl.web.management;
 
-import core.framework.api.http.ContentType;
-import core.framework.api.util.Lists;
-import core.framework.api.web.Request;
-import core.framework.api.web.Response;
 import core.framework.impl.scheduler.Scheduler;
+import core.framework.util.Lists;
+import core.framework.web.Request;
+import core.framework.web.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.UnknownHostException;
 import java.util.List;
 
 /**
@@ -22,8 +20,8 @@ public class SchedulerController {
         this.scheduler = scheduler;
     }
 
-    public Response listJobs(Request request) throws UnknownHostException {
-        ControllerHelper.validateFromLocalNetwork(request.clientIP());
+    public Response jobs(Request request) {
+        ControllerHelper.assertFromLocalNetwork(request.clientIP());
 
         List<JobView> jobs = Lists.newArrayList();
         scheduler.triggers.forEach((name, trigger) -> {
@@ -36,12 +34,12 @@ public class SchedulerController {
         return Response.bean(jobs);
     }
 
-    public Response triggerJob(Request request) throws UnknownHostException {
-        ControllerHelper.validateFromLocalNetwork(request.clientIP());
+    public Response triggerJob(Request request) {
+        ControllerHelper.assertFromLocalNetwork(request.clientIP());
 
         String job = request.pathParam("job");
         logger.info("trigger job, job={}, clientIP={}", job, request.clientIP());
         scheduler.triggerNow(job);
-        return Response.text("job triggered, job=" + job, ContentType.TEXT_PLAIN);
+        return Response.text("job triggered, job=" + job);
     }
 }

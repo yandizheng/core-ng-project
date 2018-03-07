@@ -1,8 +1,8 @@
 package core.framework.impl.scheduler;
 
 
-import core.framework.api.scheduler.Job;
-import core.framework.api.util.Randoms;
+import core.framework.scheduler.Job;
+import core.framework.util.Randoms;
 
 import java.time.Duration;
 
@@ -32,12 +32,12 @@ public final class FixedRateTrigger implements Trigger {
 
     @Override
     public void schedule(Scheduler scheduler) {
-        Duration delay = Duration.ofMillis((long) Randoms.number(8000, 15000)); // delay 8s to 15s
+        Duration delay = Duration.ofMillis((long) Randoms.number(1000, 3000)); // delay 1s to 3s
         scheduler.schedule(this, delay, rate);
     }
 
     @Override
     public String frequency() {
-        return "fixed-rate@" + rate;
+        return "fixedRate@" + rate;
     }
 }

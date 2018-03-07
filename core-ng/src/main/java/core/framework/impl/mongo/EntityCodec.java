@@ -1,6 +1,6 @@
 package core.framework.impl.mongo;
 
-import core.framework.api.util.Exceptions;
+import core.framework.util.Exceptions;
 import org.bson.BsonObjectId;
 import org.bson.BsonReader;
 import org.bson.BsonString;
@@ -16,14 +16,14 @@ import org.bson.types.ObjectId;
 /**
  * @author neo
  */
-public final class EntityCodec<T> implements CollectibleCodec<T> {
+final class EntityCodec<T> implements CollectibleCodec<T> {
     final EntityIdHandler<T> idHandler;
     private final Class<T> entityClass;
     private final EntityEncoder<T> encoder;
     private final EntityDecoder<T> decoder;
     private final IdGenerator idGenerator = new ObjectIdGenerator();
 
-    public EntityCodec(Class<T> entityClass, EntityIdHandler<T> idHandler, EntityEncoder<T> encoder, EntityDecoder<T> decoder) {
+    EntityCodec(Class<T> entityClass, EntityIdHandler<T> idHandler, EntityEncoder<T> encoder, EntityDecoder<T> decoder) {
         this.entityClass = entityClass;
         this.idHandler = idHandler;
         this.encoder = encoder;

@@ -1,32 +1,48 @@
 package core.framework.impl.mongo;
 
+import core.framework.util.ClasspathResources;
 import org.bson.types.ObjectId;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * @author neo
  */
-public class EntityIdHandlerBuilderTest {
-    @Test
-    public void setId() {
-        EntityIdHandler<TestEntity> handler = new EntityIdHandlerBuilder<>(TestEntity.class).build();
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class EntityIdHandlerBuilderTest {
+    private EntityIdHandlerBuilder<TestEntity> builder;
+    private EntityIdHandler<TestEntity> handler;
 
+    @BeforeAll
+    void createEntityIdHandler() {
+        builder = new EntityIdHandlerBuilder<>(TestEntity.class);
+        handler = builder.build();
+    }
+
+    @Test
+    void sourceCode() {
+        String sourceCode = builder.builder.sourceCode();
+        assertEquals(ClasspathResources.text("mongo-test/entity-id-handler.java"), sourceCode);
+    }
+
+    @Test
+    void setId() {
         ObjectId id = new ObjectId();
         TestEntity entity = new TestEntity();
         handler.set(entity, id);
 
-        Assert.assertEquals(id, entity.id);
+        assertEquals(id, entity.id);
     }
 
     @Test
-    public void getId() {
-        EntityIdHandler<TestEntity> handler = new EntityIdHandlerBuilder<>(TestEntity.class).build();
-
+    void getId() {
         TestEntity entity = new TestEntity();
         entity.id = new ObjectId();
         ObjectId id = (ObjectId) handler.get(entity);
 
-        Assert.assertEquals(entity.id, id);
+        assertEquals(entity.id, id);
     }
 }

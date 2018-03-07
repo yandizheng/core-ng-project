@@ -1,16 +1,21 @@
 package core.framework.impl.web.response;
 
-import core.framework.api.http.ContentType;
+import io.undertow.io.Sender;
+
+import java.nio.ByteBuffer;
 
 /**
  * @author rainbow.cai
  */
-public class ByteArrayBody implements Body {
-    final byte[] bytes;
-    final ContentType contentType;
+public final class ByteArrayBody implements Body {
+    private final byte[] bytes;
 
-    public ByteArrayBody(byte[] bytes, ContentType contentType) {
+    public ByteArrayBody(byte[] bytes) {
         this.bytes = bytes;
-        this.contentType = contentType;
+    }
+
+    @Override
+    public void send(Sender sender, ResponseHandlerContext context) {
+        sender.send(ByteBuffer.wrap(bytes));
     }
 }

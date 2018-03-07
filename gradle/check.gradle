@@ -1,41 +1,62 @@
-apply plugin: 'checkstyle'
-apply plugin: 'pmd'
-apply plugin: 'findbugs'
-
-checkstyle {
+buildscript {
     repositories {
-        mavenCentral()
-        maven {
-            url "http://sevntu-checkstyle.github.com/sevntu.checkstyle/maven2"
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "gradle.plugin.com.github.spotbugs:gradlePlugin:1.6.0"
+    }
+}
+
+subprojects {
+    apply plugin: 'checkstyle'
+    apply plugin: 'pmd'
+    apply plugin: com.github.spotbugs.SpotBugsPlugin
+    apply plugin: 'jacoco'
+
+    checkstyle {
+        dependencies {
+            checkstyle 'com.puppycrawl.tools:checkstyle:8.8'
+            checkstyle 'com.github.sevntu-checkstyle:sevntu-checks:1.27.0'
+        }
+
+        configFile = rootProject.file('gradle/check/checkstyle.xml')
+        configProperties['configDir'] = configFile.parentFile
+    }
+
+    pmd {
+        ruleSets = []
+        ruleSetFiles = rootProject.files('gradle/check/pmd.xml')
+        toolVersion = '6.1.0'
+        consoleOutput = true
+    }
+
+    spotbugs {
+        effort = 'max'
+        reportLevel = 'low'
+        excludeFilter = rootProject.file('gradle/check/spotbugs-filter.xml')
+        toolVersion = '3.1.2'
+    }
+
+    tasks.withType(com.github.spotbugs.SpotBugsTask) {
+        reports {
+            xml.enabled = false
+            html.enabled = true
         }
     }
 
-    dependencies {
-        checkstyle 'com.puppycrawl.tools:checkstyle:7.7'
-        checkstyle 'com.github.sevntu.checkstyle:sevntu-checks:1.23.1'
+    jacoco {
+        toolVersion = '0.8.0'
     }
 
-    configFile = rootProject.file('gradle/checkstyle/checkstyle.xml')
-    configProperties['configDir'] = configFile.parentFile
-}
+    jacocoTestReport {
+        // to generate cross sub project report, run: gradlew test && gradlew jacocoTestReport
+        executionData = fileTree(rootDir).include('build/**/jacoco/test.exec')
 
-pmd {
-    ruleSets = []
-    ruleSetFiles = rootProject.files('gradle/pmd/rule-set.xml')
-    toolVersion = '5.6.1'
-    consoleOutput = true
-}
-
-findbugs {
-    effort = 'max'
-    reportLevel = 'low'
-    excludeFilter = rootProject.file('gradle/findbugs/exclude-filter.xml')
-    toolVersion = '3.0.1'
-}
-
-tasks.withType(FindBugs) {
-    reports {
-        xml.enabled = false
-        html.enabled = true
+        reports {
+            xml.enabled = true
+            xml.destination rootProject.file("${buildDir}/reports/jacoco/report.xml")
+            html.enabled = true
+            csv.enabled = false
+        }
     }
 }

@@ -1,11 +1,11 @@
 package core.framework.test.redis;
 
-import core.framework.api.redis.Redis;
-import core.framework.api.redis.RedisHash;
-import core.framework.api.redis.RedisSet;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.util.Sets;
+import core.framework.redis.Redis;
+import core.framework.redis.RedisHash;
+import core.framework.redis.RedisSet;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.util.Sets;
 
 import java.time.Duration;
 import java.util.Map;
@@ -23,6 +23,12 @@ public final class MockRedis implements Redis {
 
     @Override
     public String get(String key) {
+        Value value = value(key);
+        if (value == null) return null;
+        return value.value;
+    }
+
+    private Value value(String key) {
         Value value = store.get(key);
         if (value == null) return null;
         if (value.type != ValueType.VALUE) throw Exceptions.error("invalid type, key={}, type={}", key, value.type);
@@ -30,7 +36,7 @@ public final class MockRedis implements Redis {
             store.remove(key);
             return null;
         }
-        return value.value;
+        return value;
     }
 
     @Override
@@ -67,8 +73,21 @@ public final class MockRedis implements Redis {
     }
 
     @Override
-    public void del(String key) {
-        store.remove(key);
+    public boolean del(String key) {
+        Value removed = store.remove(key);
+        return removed != null;
+    }
+
+    @Override
+    public long increaseBy(String key, long increment) {
+        Value value = value(key);
+        if (value == null) {
+            value = Value.value("0");   // according to https://redis.io/commands/incrby, set to 0 if key not exists
+            store.put(key, value);
+        }
+        long result = Long.parseLong(value.value) + increment;
+        value.value = String.valueOf(result);
+        return result;
     }
 
     @Override
@@ -119,9 +138,9 @@ public final class MockRedis implements Redis {
         }
 
         final ValueType type;
-        final String value;
         final Map<String, String> hash;
         final Set<String> set;
+        String value;
         Long expirationTime;
 
         private Value(ValueType type, String value, Map<String, String> hash, Set<String> set) {

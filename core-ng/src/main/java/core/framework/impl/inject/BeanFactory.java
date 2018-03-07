@@ -1,11 +1,12 @@
 package core.framework.impl.inject;
 
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.util.Types;
+import core.framework.impl.reflect.Params;
+import core.framework.inject.Inject;
+import core.framework.inject.Named;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.util.Types;
 
-import javax.inject.Inject;
-import javax.inject.Named;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Executable;
@@ -17,34 +18,31 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
+import java.util.Arrays;
 import java.util.Map;
 
 /**
  * @author neo
  */
 public class BeanFactory {
-    final Map<Key, Object> beans = Maps.newHashMap();
+    private final Map<Key, Object> beans = Maps.newHashMap();
 
     public void bind(Type type, String name, Object instance) {
-        if (instance == null) throw new Error("instance is null");
+        if (instance == null) throw new Error("instance must not be null");
 
         if (!isTypeOf(instance, type))
-            throw Exceptions.error("instance type doesn't match, type={}, instanceType={}", type, instance.getClass());
+            throw Exceptions.error("instance type does not match, type={}, instanceType={}", type.getTypeName(), instance.getClass().getCanonicalName());
 
         Object previous = beans.put(new Key(type, name), instance);
         if (previous != null)
             throw Exceptions.error("found duplicate bean, type={}, name={}, previous={}", type.getTypeName(), name, previous);
     }
 
-    public boolean registered(Type type, String name) {
-        return beans.containsKey(new Key(type, name));
-    }
-
     public <T> T bean(Type type, String name) {
         Key key = new Key(type, name);
         @SuppressWarnings("unchecked")
         T bean = (T) beans.get(key);
-        if (bean == null) throw Exceptions.error("can not find bean, type={}, name={}", type, name);
+        if (bean == null) throw Exceptions.error("can not find bean, type={}, name={}", type.getTypeName(), name);
         return bean;
     }
 
@@ -56,53 +54,43 @@ public class BeanFactory {
             T instance = construct(instanceClass);
             inject(instance);
             return instance;
-        } catch (IllegalAccessException | InstantiationException | RuntimeException e) {
-            throw Exceptions.error("failed to create bean, instanceClass={}, error={}", instanceClass, e.getMessage(), e);
-        } catch (InvocationTargetException e) {
-            throw Exceptions.error("failed to create bean, instanceClass={}, error={}", instanceClass, e.getTargetException().getMessage(), e);
+        } catch (ReflectiveOperationException e) {
+            throw new Error(e);
         }
     }
 
-    private <T> T construct(Class<T> instanceClass) throws IllegalAccessException, InvocationTargetException, InstantiationException {
-        Constructor<?> targetConstructor = null;
-
-        for (Constructor<?> constructor : instanceClass.getDeclaredConstructors()) {
-            if (constructor.isAnnotationPresent(Inject.class)) {
-                if (targetConstructor != null)
-                    throw Exceptions.error("only one constructor can have @Inject, previous={}, current={}", targetConstructor, constructor);
-                targetConstructor = constructor;
-            }
-        }
+    public <T> void inject(T instance) {
         try {
-            if (targetConstructor == null) targetConstructor = instanceClass.getDeclaredConstructor();
-        } catch (NoSuchMethodException e) {
-            throw Exceptions.error("default constructor is required, class={}", instanceClass, e);
+            Class<?> visitorType = instance.getClass();
+            while (!visitorType.equals(Object.class)) {
+                for (Field field : visitorType.getDeclaredFields()) {
+                    if (field.isAnnotationPresent(Inject.class)) {
+                        makeAccessible(field);
+                        field.set(instance, lookupValue(field));
+                    }
+                }
+                for (Method method : visitorType.getDeclaredMethods()) {
+                    if (method.isAnnotationPresent(Inject.class)) {
+                        makeAccessible(method);
+                        Object[] params = lookupParams(method);
+                        method.invoke(instance, params);
+                    }
+                }
+                visitorType = visitorType.getSuperclass();
+            }
+        } catch (IllegalAccessException e) {
+            throw new Error(e);
+        } catch (InvocationTargetException e) {
+            throw Exceptions.error("failed to inject bean, beanClass={}, error={}", instance.getClass().getCanonicalName(), e.getTargetException().getMessage(), e);
         }
-
-        Object[] params = lookupParams(targetConstructor);
-
-        return instanceClass.cast(targetConstructor.newInstance(params));
     }
 
-    private <T> void inject(T instance) throws IllegalAccessException, InvocationTargetException {
-        Class<?> visitorType = instance.getClass();
-        while (!visitorType.equals(Object.class)) {
-            for (Field field : visitorType.getDeclaredFields()) {
-                if (field.isAnnotationPresent(Inject.class)) {
-                    makeAccessible(field);
-                    field.set(instance, lookupValue(field));
-                }
-            }
-
-            for (Method method : visitorType.getDeclaredMethods()) {
-                if (method.isAnnotationPresent(Inject.class)) {
-                    makeAccessible(method);
-                    Object[] params = lookupParams(method);
-                    method.invoke(instance, params);
-                }
-            }
-            visitorType = visitorType.getSuperclass();
+    private <T> T construct(Class<T> instanceClass) throws ReflectiveOperationException {
+        Constructor<?>[] constructors = instanceClass.getDeclaredConstructors();
+        if (constructors.length > 1 || constructors[0].getParameterCount() > 1 || !Modifier.isPublic(constructors[0].getModifiers())) {
+            throw Exceptions.error("instance class must have only one public default constructor, class={}, constructors={}", instanceClass.getCanonicalName(), Arrays.toString(constructors));
         }
+        return instanceClass.getDeclaredConstructor().newInstance();
     }
 
     private Object lookupValue(Field field) {
@@ -117,7 +105,8 @@ public class BeanFactory {
         Object[] params = new Object[paramTypes.length];
         for (int i = 0; i < paramTypes.length; i++) {
             Type paramType = stripOutOwnerType(paramTypes[i]);
-            String name = name(paramAnnotations[i]);
+            Named named = Params.annotation(paramAnnotations[i], Named.class);
+            String name = named == null ? null : named.value();
             params[i] = bean(paramType, name);
         }
         return params;
@@ -141,15 +130,6 @@ public class BeanFactory {
             method.setAccessible(true);
             return method;
         });
-    }
-
-    private String name(Annotation[] paramAnnotation) {
-        for (Annotation annotation : paramAnnotation) {
-            if (annotation.annotationType().equals(Named.class)) {
-                return ((Named) annotation).value();
-            }
-        }
-        return null;
     }
 
     private boolean isTypeOf(Object instance, Type type) {

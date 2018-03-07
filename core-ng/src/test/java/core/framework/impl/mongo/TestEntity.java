@@ -1,8 +1,9 @@
 package core.framework.impl.mongo;
 
-import core.framework.api.mongo.Collection;
-import core.framework.api.mongo.Field;
-import core.framework.api.mongo.Id;
+import core.framework.api.validate.NotNull;
+import core.framework.mongo.Collection;
+import core.framework.mongo.Field;
+import core.framework.mongo.Id;
 import org.bson.types.ObjectId;
 
 import java.time.LocalDateTime;
@@ -20,11 +21,18 @@ public class TestEntity {
     @Id
     public ObjectId id;
 
+    @NotNull
     @Field(name = INT_FIELD)
     public Integer intField;
 
     @Field(name = "double_field")
     public Double doubleField;
+
+    @Field(name = "long_field")
+    public Long longField;
+
+    @Field(name = "boolean_field")
+    public Boolean booleanField;
 
     @Field(name = "date_field")
     public LocalDateTime dateField;

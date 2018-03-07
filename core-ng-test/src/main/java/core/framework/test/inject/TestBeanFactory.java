@@ -1,9 +1,9 @@
 package core.framework.test.inject;
 
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Sets;
 import core.framework.impl.inject.BeanFactory;
 import core.framework.impl.inject.Key;
+import core.framework.util.Exceptions;
+import core.framework.util.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +42,6 @@ public final class TestBeanFactory extends BeanFactory {
         Set<Key> notAppliedBindings = new HashSet<>(overrideBindings);
         notAppliedBindings.removeAll(skippedBindings);
         if (!notAppliedBindings.isEmpty())
-            throw Exceptions.error("found not applied override binding, please check test module, bindings={}", notAppliedBindings);
+            throw Exceptions.error("found unnecessary override bindings, please check test module, bindings={}", notAppliedBindings);
     }
 }

@@ -1,48 +1,34 @@
 package core.framework.impl.web.route;
 
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * @author neo
  */
-public class PathPatternValidatorTest {
-    @Rule
-    public ExpectedException exception = ExpectedException.none();
-
-    private PathPatternValidator validator;
-
-    @Before
-    public void createPathPatternValidator() {
-        validator = new PathPatternValidator();
+class PathPatternValidatorTest {
+    @Test
+    void duplicateVariable() {
+        Error error = assertThrows(Error.class, () -> new PathPatternValidator("/:name/path/:name").validate());
+        assertThat(error.getMessage()).contains("duplicate");
     }
 
     @Test
-    public void duplicateVariable() {
-        exception.expect(Error.class);
-        exception.expectMessage("duplicate");
+    void validate() {
+        new PathPatternValidator("/robot.txt").validate();
+        new PathPatternValidator("/images").validate();
 
-        validator.validate("/:name/path/:name");
+        new PathPatternValidator("/path-with-trailing-slash/").validate();
+
+        new PathPatternValidator("/user/:id/name").validate();
+        new PathPatternValidator("/v2/user/:id").validate();
     }
 
     @Test
-    public void validate() {
-        validator.validate("/robot.txt");
-        validator.validate("/images");
-
-        validator.validate("/path-with-trailing-slash/");
-
-        validator.validate("/user/:id/name");
-        validator.validate("/v2/user/:id");
-    }
-
-    @Test
-    public void invalidVariable() {
-        exception.expect(Error.class);
-        exception.expectMessage(":name(");
-
-        validator.validate("/path/:name(");
+    void invalidVariable() {
+        Error error = assertThrows(Error.class, () -> new PathPatternValidator("/path/:name(").validate());
+        assertThat(error.getMessage()).contains(":name(");
     }
 }

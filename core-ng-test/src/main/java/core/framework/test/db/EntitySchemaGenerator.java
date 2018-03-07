@@ -1,15 +1,16 @@
 package core.framework.test.db;
 
-import core.framework.api.db.Column;
-import core.framework.api.db.Database;
-import core.framework.api.db.PrimaryKey;
-import core.framework.api.db.Table;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Lists;
-import core.framework.api.util.StopWatch;
 import core.framework.api.validate.Length;
 import core.framework.api.validate.NotNull;
+import core.framework.db.Column;
+import core.framework.db.Database;
+import core.framework.db.PrimaryKey;
+import core.framework.db.Table;
 import core.framework.impl.reflect.Classes;
+import core.framework.util.Exceptions;
+import core.framework.util.Lists;
+import core.framework.util.StopWatch;
+import core.framework.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,20 +37,26 @@ public final class EntitySchemaGenerator {
 
     public void generate() {
         StopWatch watch = new StopWatch();
-        String sql = schemeSQL();
+        List<String> statements = schemeStatements();
         try {
-            database.execute(sql);
+            for (String statement : statements) {
+                database.execute(statement);
+            }
         } finally {
-            logger.info("create schema, entityClass={}, sql={}, elapsedTime={}", entityClass.getCanonicalName(), sql, watch.elapsedTime());
+            logger.info("create schema, entityClass={}, sql={}, elapsedTime={}", entityClass.getCanonicalName(), statements, watch.elapsedTime());
         }
     }
 
-    private String schemeSQL() {
-        StringBuilder builder = new StringBuilder("CREATE TABLE ");
+    private List<String> schemeStatements() {
+        List<String> statements = Lists.newArrayList();
+
+        StringBuilder builder = new StringBuilder(256)
+                .append("CREATE TABLE ");
         Table table = entityClass.getDeclaredAnnotation(Table.class);
         builder.append(table.name()).append(" (");
 
         List<String> primaryKeys = Lists.newArrayList();
+
         for (Field field : Classes.instanceFields(entityClass)) {
             Column column = field.getDeclaredAnnotation(Column.class);
             PrimaryKey primaryKey = field.getDeclaredAnnotation(PrimaryKey.class);
@@ -59,6 +66,9 @@ public final class EntitySchemaGenerator {
 
             if (primaryKey != null) {
                 if (primaryKey.autoIncrement()) builder.append(" AUTO_INCREMENT");
+                if (!Strings.isEmpty(primaryKey.sequence())) {
+                    statements.add("CREATE SEQUENCE IF NOT EXISTS " + primaryKey.sequence());
+                }
                 primaryKeys.add(column.name());
             }
 
@@ -80,7 +90,9 @@ public final class EntitySchemaGenerator {
 
         builder.append("))");
 
-        return builder.toString();
+        statements.add(builder.toString());
+
+        return statements;
     }
 
     // http://dev.mysql.com/doc/connector-j/en/connector-j-reference-type-conversions.html

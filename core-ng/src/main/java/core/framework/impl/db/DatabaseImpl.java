@@ -1,15 +1,15 @@
 package core.framework.impl.db;
 
-import core.framework.api.db.Database;
-import core.framework.api.db.Repository;
-import core.framework.api.db.Transaction;
-import core.framework.api.db.UncheckedSQLException;
-import core.framework.api.log.ActionLogContext;
-import core.framework.api.log.Markers;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.util.StopWatch;
+import core.framework.db.Database;
+import core.framework.db.Repository;
+import core.framework.db.Transaction;
+import core.framework.db.UncheckedSQLException;
 import core.framework.impl.resource.Pool;
+import core.framework.log.ActionLogContext;
+import core.framework.log.Markers;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.util.StopWatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,27 +30,29 @@ import java.util.Properties;
  * @author neo
  */
 public final class DatabaseImpl implements Database {
+    static final RowMapper.IntegerRowMapper ROW_MAPPER_INTEGER = new RowMapper.IntegerRowMapper();
+
     public final Pool<Connection> pool;
     public final DatabaseOperation operation;
 
     private final Logger logger = LoggerFactory.getLogger(DatabaseImpl.class);
     private final Map<Class<?>, RowMapper<?>> rowMappers = Maps.newHashMap();
     public int tooManyRowsReturnedThreshold = 1000;
-    public String url;
     public String user;
     public String password;
+    public Vendor vendor;
     long slowOperationThresholdInNanos = Duration.ofSeconds(5).toNanos();
+    private String url;
     private Properties driverProperties;
     private Duration timeout;
     private Driver driver;
 
-    public DatabaseImpl() {
+    public DatabaseImpl(String name) {
         initializeRowMappers();
 
-        pool = new Pool<>(this::createConnection, Connection::close);
-        pool.name("db");
+        pool = new Pool<>(this::createConnection, name);
         pool.size(5, 50);    // default optimization for AWS medium/large instances
-        pool.maxIdleTime(Duration.ofHours(2));  // make sure db server does not kill connection shorter than this, e.g. MySQL default wait_timeout is 8 hours
+        pool.maxIdleTime = Duration.ofHours(2);  // make sure db server does not kill connection shorter than this, e.g. MySQL default wait_timeout is 8 hours
 
         operation = new DatabaseOperation(pool);
         timeout(Duration.ofSeconds(15));
@@ -58,7 +60,7 @@ public final class DatabaseImpl implements Database {
 
     private void initializeRowMappers() {
         rowMappers.put(String.class, new RowMapper.StringRowMapper());
-        rowMappers.put(Integer.class, new RowMapper.IntegerRowMapper());
+        rowMappers.put(Integer.class, ROW_MAPPER_INTEGER);
         rowMappers.put(Long.class, new RowMapper.LongRowMapper());
         rowMappers.put(Double.class, new RowMapper.DoubleRowMapper());
         rowMappers.put(BigDecimal.class, new RowMapper.BigDecimalRowMapper());
@@ -116,23 +118,27 @@ public final class DatabaseImpl implements Database {
     }
 
     private Driver driver(String url) {
+        if (url.startsWith("jdbc:mysql:")) {
+            return createDriver("com.mysql.cj.jdbc.Driver");
+        } else if (url.startsWith("jdbc:oracle:")) {
+            return createDriver("oracle.jdbc.OracleDriver");
+        } else if (url.startsWith("jdbc:hsqldb:")) {
+            return createDriver("org.hsqldb.jdbc.JDBCDriver");
+        } else {
+            throw Exceptions.error("not supported database, url={}", url);
+        }
+    }
+
+    private Driver createDriver(String driverClass) {
         try {
-            if (url.startsWith("jdbc:mysql:")) {
-                return (Driver) Class.forName("com.mysql.jdbc.Driver").newInstance();
-            } else if (url.startsWith("jdbc:hsqldb:")) {
-                return (Driver) Class.forName("org.hsqldb.jdbc.JDBCDriver").newInstance();
-            } else if (url.startsWith("jdbc:oracle:")) {
-                return (Driver) Class.forName("oracle.jdbc.OracleDriver").newInstance();
-            } else {
-                throw Exceptions.error("not supported database, please contact arch team, url={}", url);
-            }
-        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+            return (Driver) Class.forName(driverClass).getDeclaredConstructor().newInstance();
+        } catch (ReflectiveOperationException e) {
             throw new Error(e);
         }
     }
 
-    public void slowOperationThreshold(Duration slowOperationThreshold) {
-        slowOperationThresholdInNanos = slowOperationThreshold.toNanos();
+    public void slowOperationThreshold(Duration threshold) {
+        slowOperationThresholdInNanos = threshold.toNanos();
     }
 
     public <T> void view(Class<T> viewClass) {
@@ -164,14 +170,16 @@ public final class DatabaseImpl implements Database {
     @Override
     public <T> List<T> select(String sql, Class<T> viewClass, Object... params) {
         StopWatch watch = new StopWatch();
+        int returnedRows = 0;
         try {
             List<T> results = operation.select(sql, rowMapper(viewClass), params);
-            checkTooManyRowsReturned(results.size());
+            returnedRows = results.size();
+            checkTooManyRowsReturned(returnedRows);
             return results;
         } finally {
             long elapsedTime = watch.elapsedTime();
-            ActionLogContext.track("db", elapsedTime);
-            logger.debug("select, sql={}, params={}, elapsedTime={}", sql, params, elapsedTime);
+            ActionLogContext.track("db", elapsedTime, returnedRows, 0);
+            logger.debug("select, sql={}, params={}, updatedRows={}, elapsedTime={}", sql, params, returnedRows, elapsedTime);
             checkSlowOperation(elapsedTime);
         }
     }
@@ -183,7 +191,7 @@ public final class DatabaseImpl implements Database {
             return operation.selectOne(sql, rowMapper(viewClass), params);
         } finally {
             long elapsedTime = watch.elapsedTime();
-            ActionLogContext.track("db", elapsedTime);
+            ActionLogContext.track("db", elapsedTime, 1, 0);
             logger.debug("selectOne, sql={}, params={}, elapsedTime={}", sql, params, elapsedTime);
             checkSlowOperation(elapsedTime);
         }
@@ -192,12 +200,14 @@ public final class DatabaseImpl implements Database {
     @Override
     public int execute(String sql, Object... params) {
         StopWatch watch = new StopWatch();
+        int updatedRows = 0;
         try {
-            return operation.update(sql, params);
+            updatedRows = operation.update(sql, params);
+            return updatedRows;
         } finally {
             long elapsedTime = watch.elapsedTime();
-            ActionLogContext.track("db", elapsedTime);
-            logger.debug("execute, sql={}, params={}, elapsedTime={}", sql, params, elapsedTime);
+            ActionLogContext.track("db", elapsedTime, 0, updatedRows);
+            logger.debug("execute, sql={}, params={}, updatedRows={}, elapsedTime={}", sql, params, updatedRows, elapsedTime);
             checkSlowOperation(elapsedTime);
         }
     }

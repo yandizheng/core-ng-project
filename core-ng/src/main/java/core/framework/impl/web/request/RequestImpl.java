@@ -1,17 +1,16 @@
 package core.framework.impl.web.request;
 
-import core.framework.api.http.ContentType;
-import core.framework.api.http.HTTPMethod;
-import core.framework.api.util.Encodings;
-import core.framework.api.util.Exceptions;
-import core.framework.api.util.Maps;
-import core.framework.api.web.CookieSpec;
-import core.framework.api.web.MultipartFile;
-import core.framework.api.web.Request;
-import core.framework.api.web.Session;
-import core.framework.api.web.exception.BadRequestException;
-import core.framework.impl.json.JSONMapper;
-import core.framework.impl.web.BeanValidator;
+import core.framework.http.ContentType;
+import core.framework.http.HTTPMethod;
+import core.framework.impl.web.bean.RequestBeanMapper;
+import core.framework.util.Encodings;
+import core.framework.util.Exceptions;
+import core.framework.util.Maps;
+import core.framework.web.CookieSpec;
+import core.framework.web.MultipartFile;
+import core.framework.web.Request;
+import core.framework.web.Session;
+import core.framework.web.exception.BadRequestException;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.Cookie;
 
@@ -31,7 +30,7 @@ public final class RequestImpl implements Request {
     final Map<String, MultipartFile> files = Maps.newHashMap();
 
     private final HttpServerExchange exchange;
-    private final BeanValidator validator;
+    private final RequestBeanMapper mapper;
     public Session session;
     HTTPMethod method;
     String clientIP;
@@ -41,9 +40,9 @@ public final class RequestImpl implements Request {
     ContentType contentType;
     byte[] body;
 
-    public RequestImpl(HttpServerExchange exchange, BeanValidator validator) {
+    public RequestImpl(HttpServerExchange exchange, RequestBeanMapper mapper) {
         this.exchange = exchange;
-        this.validator = validator;
+        this.mapper = mapper;
     }
 
     @Override
@@ -62,7 +61,7 @@ public final class RequestImpl implements Request {
     }
 
     @Override
-    public String path() {  // exchange returns decoded path
+    public String path() {
         return exchange.getRequestPath();
     }
 
@@ -143,27 +142,22 @@ public final class RequestImpl implements Request {
     }
 
     @Override
-    public <T> T bean(Type instanceType) {
+    public <T> T bean(Type beanType) {
         try {
-            T bean = parseBean(instanceType);
-            return validator.validate(instanceType, bean);
+            if (method == HTTPMethod.GET || method == HTTPMethod.DELETE) {
+                return mapper.fromParams(beanType, queryParams);
+            } else if (method == HTTPMethod.POST || method == HTTPMethod.PUT || method == HTTPMethod.PATCH) {
+                if (!formParams.isEmpty()) {
+                    return mapper.fromParams(beanType, formParams);
+                } else if (body != null && contentType != null && ContentType.APPLICATION_JSON.mediaType().equals(contentType.mediaType())) {
+                    return mapper.fromJSON(beanType, body);
+                }
+                throw new BadRequestException("body is missing or unsupported content type, method=" + method + ", contentType=" + contentType);
+            } else {
+                throw Exceptions.error("not supported method, method={}", method);
+            }
         } catch (UncheckedIOException e) {
             throw new BadRequestException(e.getMessage(), BadRequestException.DEFAULT_ERROR_CODE, e);
-        }
-    }
-
-    private <T> T parseBean(Type instanceType) {
-        if (method == HTTPMethod.GET || method == HTTPMethod.DELETE) {
-            return JSONMapper.fromMapValue(instanceType, queryParams);
-        } else if (method == HTTPMethod.POST || method == HTTPMethod.PUT) {
-            if (!formParams.isEmpty()) {
-                return JSONMapper.fromMapValue(instanceType, formParams);
-            } else if (body != null && contentType != null && ContentType.APPLICATION_JSON.mediaType().equals(contentType.mediaType())) {
-                return JSONMapper.fromJSON(instanceType, body);
-            }
-            throw new BadRequestException("body is missing or unsupported content type, method=" + method + ", contentType=" + contentType);
-        } else {
-            throw Exceptions.error("not supported method, method={}", method);
         }
     }
 }

@@ -1,29 +1,30 @@
 package core.framework.test.redis;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author neo
  */
-public class MockRedisTest {
+class MockRedisTest {
     MockRedis redis;
 
-    @Before
-    public void createMockRedis() {
+    @BeforeEach
+    void createMockRedis() {
         redis = new MockRedis();
     }
 
     @Test
-    public void get() {
+    void get() {
         redis.set("key1", "value");
 
         String value = redis.get("key1");
@@ -31,7 +32,7 @@ public class MockRedisTest {
     }
 
     @Test
-    public void multiGet() {
+    void multiGet() {
         redis.set("key2", "value2");
         redis.set("key3", "value3");
         Map<String, String> values = redis.multiGet("key1", "key3", "key2");
@@ -42,7 +43,7 @@ public class MockRedisTest {
     }
 
     @Test
-    public void forEach() {
+    void forEach() {
         redis.set("matched-1", "matched-value-1");
         redis.set("matched-2", "matched-value-2");
         redis.set("matched-3", "matched-value-3");
@@ -58,5 +59,16 @@ public class MockRedisTest {
         });
 
         assertEquals(3, count.get());
+    }
+
+    @Test
+    void increaseBy() {
+        long result = redis.increaseBy("counter", 1);
+        assertThat(result).isEqualTo(1);
+        assertThat(redis.get("counter")).isEqualTo("1");
+
+        result = redis.increaseBy("counter", 5);
+        assertThat(result).isEqualTo(6);
+        assertThat(redis.get("counter")).isEqualTo("6");
     }
 }
